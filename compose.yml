@@ -1,0 +1,16 @@
+﻿version: '3.8'
+
+services:
+  nm-api:
+    build:
+      context: . 
+      dockerfile: Api/Dockerfile 
+    ports:
+      - "8080:8080"
+      - "8444:8444"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - Encryption__SecretKey=YOUR_SECURE_ENCRYPTION_KEY_FOR_NM_HERE
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: always

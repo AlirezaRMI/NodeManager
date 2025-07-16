@@ -1,0 +1,5 @@
+C:\Users\WWITDs\RiderProjects\NodeManager\Application\obj\Debug\net9.0\Application.csproj.AssemblyReference.cache
+C:\Users\WWITDs\RiderProjects\NodeManager\Application\obj\Debug\net9.0\Application.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\WWITDs\RiderProjects\NodeManager\Application\obj\Debug\net9.0\Application.AssemblyInfoInputs.cache
+C:\Users\WWITDs\RiderProjects\NodeManager\Application\obj\Debug\net9.0\Application.AssemblyInfo.cs
+C:\Users\WWITDs\RiderProjects\NodeManager\Application\obj\Debug\net9.0\Application.csproj.CoreCompileInputs.cache
