@@ -1,6 +1,5 @@
 ﻿#!/usr/bin/env bash
 
-
 set -e
 
 if ! command -v docker &> /dev/null; then
@@ -13,7 +12,7 @@ if ! command -v docker &> /dev/null; then
       "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
       $(. /etc/os-release && echo \"$VERSION_CODENAME\") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
     sudo apt-get update
-    sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin:contentReference[oaicite:26]{index=26}
+    sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 fi
 
 sudo systemctl enable docker.service
@@ -24,22 +23,23 @@ if ! command -v git &> /dev/null; then
     sudo apt-get install -y git
 fi
 
-REPO_URL="<<< آدرس گیت‌هاب پروژه NodeManager را اینجا قرار دهید >>>"
+REPO_URL="https://github.com/AlirezaRMI/NodeManager.git"
 INSTALL_DIR="/opt/nodemanager"
 if [ ! -d "$INSTALL_DIR" ]; then
     echo "Cloning NodeManager repository from GitHub..."
     sudo git clone "$REPO_URL" "$INSTALL_DIR"
+    cd "$INSTALL_DIR/Api"
 else
     echo "Updating existing NodeManager repository..."
     sudo git -C "$INSTALL_DIR" pull
 fi
 
 cd "$INSTALL_DIR"
-if [ -f "docker-compose.yml" ]; then
-    echo "docker-compose.yml found. Bringing up services with Docker Compose..."
+if [ -f "compose.yml" ]; then
+    echo "compose.yml found. Bringing up services with Docker Compose..."
     sudo docker compose up -d
 else
-    echo "No docker-compose.yml. Building Docker image..."
+    echo "No compose.yml. Building Docker image..."
     sudo docker build -t nodemanager:latest .
     
     if sudo docker ps -a --format '{{.Names}}' | grep -qw nodemanager; then
@@ -61,7 +61,7 @@ Requires=docker.service
 
 [Service]
 Restart=always
-# در صورت نیاز، حذف کانتینر قبلی قبل از اجرا (اختیاری):
+
 ExecStartPre=-/usr/bin/docker rm -f nodemanager
 ExecStart=/usr/bin/docker start -a nodemanager
 ExecStop=/usr/bin/docker stop -t 10 nodemanager
