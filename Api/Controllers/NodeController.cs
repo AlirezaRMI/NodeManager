@@ -30,7 +30,7 @@ namespace Api.Controllers
         [ProducesResponseType(typeof(ApiResult<string>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResult), StatusCodes.Status404NotFound)]
         [ProducesResponseType(typeof(ApiResult), StatusCodes.Status500InternalServerError)]
-        public async Task<IActionResult> DeprovisionContainer(long containerId) 
+        public async Task<IActionResult> DeprovisionContainer(string containerId) 
         {
             var message = await service.DeprovisionContainerAsync(containerId);
             return Ok(message);
@@ -42,7 +42,7 @@ namespace Api.Controllers
         [ProducesResponseType(typeof(ApiResult<string>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResult), StatusCodes.Status404NotFound)]
         [ProducesResponseType(typeof(ApiResult), StatusCodes.Status500InternalServerError)]
-        public async Task<IActionResult> GetContainerStatus(long containerId)
+        public async Task<IActionResult> GetContainerStatus(string containerId)
         {
             var status = await service.GetContainerStatusAsync(containerId);
             return Ok(status);
@@ -53,7 +53,7 @@ namespace Api.Controllers
         [ProducesResponseType(typeof(ApiResult<string>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResult), StatusCodes.Status404NotFound)]
         [ProducesResponseType(typeof(ApiResult), StatusCodes.Status500InternalServerError)]
-        public async Task<IActionResult> GetContainerLogs(long containerId)
+        public async Task<IActionResult> GetContainerLogs(string containerId)
         {
             string logs = await service.GetContainerLogsAsync(containerId);
             return Ok(logs);

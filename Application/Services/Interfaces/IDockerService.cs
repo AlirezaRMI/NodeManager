@@ -33,42 +33,42 @@ public interface IDockerService
     /// </summary>
     /// <param name="id">ID or name of the container to stop.</param>
     /// <returns>A message indicating success.</returns>
-    Task<string> StopContainerAsync(long id);
+    Task<string> StopContainerAsync(string id);
 
     /// <summary>
     /// Starts a stopped Docker container.
     /// </summary>
     /// <param name="id">ID or name of the container to start.</param>
     /// <returns>A message indicating success.</returns>
-    Task<string> StartContainerAsync(long id);
+    Task<string> StartContainerAsync(string id);
 
     /// <summary>
     /// Deletes a Docker container.
     /// </summary>
     /// <param name="id">ID or name of the container to delete.</param>
     /// <returns>A message indicating success.</returns>
-    Task<string> DeleteContainerAsync(long id);
+    Task<string> DeleteContainerAsync(string id);
 
     /// <summary>
     /// Restarts a Docker container.
     /// </summary>
     /// <param name="id">ID or name of the container to restart.</param>
     /// <returns>A message indicating success.</returns>
-    Task<string> RestartContainerAsync(long id);
+    Task<string> RestartContainerAsync(string id);
 
     /// <summary>
     /// Gets the current status of a Docker container.
     /// </summary>
     /// <param name="id">ID or name of the container.</param>
     /// <returns>The container's status (e.g., "running", "exited").</returns>
-    Task<string> GetContainerStatusAsync(long id);
+    Task<string> GetContainerStatusAsync(string id);
 
     /// <summary>
     /// Retrieves logs from a Docker container.
     /// </summary>
     /// <param name="id">ID or name of the container.</param>
     /// <returns>The container's logs as a string.</returns>
-    Task<string> GetContainerLogsAsync(long id);
+    Task<string> GetContainerLogsAsync(string id);
 
     /// <summary>
     /// Checks if a specific port is available (not in use) on the host system.

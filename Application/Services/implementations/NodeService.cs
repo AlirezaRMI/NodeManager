@@ -104,7 +104,7 @@ public class NodeService(IDockerService dockerManager, ILogger<INodeService> log
         };
     }
 
-    public async Task<string> DeprovisionContainerAsync(long containerId)
+    public async Task<string> DeprovisionContainerAsync(string containerId)
     {
         logger.LogInformation("Deprovisioning container {ContainerId}...", containerId);
 
@@ -115,12 +115,12 @@ public class NodeService(IDockerService dockerManager, ILogger<INodeService> log
         return $"Container {containerId} deprovisioned.";
     }
 
-    public async Task<string> GetContainerStatusAsync(long containerId)
+    public async Task<string> GetContainerStatusAsync(string containerId)
     {
         return await dockerManager.GetContainerStatusAsync(containerId);
     }
 
-    public async Task<string> GetContainerLogsAsync(long containerId)
+    public async Task<string> GetContainerLogsAsync(string containerId)
     {
         return await dockerManager.GetContainerLogsAsync(containerId);
     }

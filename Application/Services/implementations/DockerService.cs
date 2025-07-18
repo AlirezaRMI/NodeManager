@@ -87,40 +87,41 @@ public class DockerService(ILogger<IDockerService> logger) : IDockerService
         logger.LogInformation("Container '{ContainerName}' created with ID: {ContainerId}", containerName, id);
         return id;
     }
+    
 
-    public async Task<string> StopContainerAsync(long idOrName)
+    public async Task<string> StopContainerAsync(string idOrName)
     {
         logger.LogInformation("Stopping container '{ContainerIdOrName}'...", idOrName);
-        await ExecuteShellCommandAsync("docker", $"stop {idOrName.ToString()}");
+        await ExecuteShellCommandAsync("docker", $"stop {idOrName}");
         return $"Container {idOrName} stopped.";
     }
 
-    public async Task<string> StartContainerAsync(long id)
+    public async Task<string> StartContainerAsync(string id)
     {
         logger.LogInformation("Starting container with ID {ContainerId}...", id);
-        await ExecuteShellCommandAsync("docker", $"start {id.ToString()}");
+        await ExecuteShellCommandAsync("docker", $"start {id}");
         return $"Container {id} started.";
     }
 
-    public async Task<string> DeleteContainerAsync(long id)
+    public async Task<string> DeleteContainerAsync(string id)
     {
         logger.LogInformation("Deleting container with ID {ContainerId}...", id);
-        await ExecuteShellCommandAsync("docker", $"rm -f {id.ToString()}");
+        await ExecuteShellCommandAsync("docker", $"rm -f {id}");
         return $"Container {id} deleted.";
     }
 
-    public async Task<string> RestartContainerAsync(long id)
+    public async Task<string> RestartContainerAsync(string id)
     {
         logger.LogInformation("Restarting container with ID {ContainerId}...", id);
-        await ExecuteShellCommandAsync("docker", $"restart {id.ToString()}");
+        await ExecuteShellCommandAsync("docker", $"restart {id}");
         return $"Container {id} restarted.";
     }
 
-    public async Task<string> GetContainerStatusAsync(long id)
+    public async Task<string> GetContainerStatusAsync(string id)
     {
         logger.LogInformation("Getting status for container with ID {ContainerId}...", id);
         var result =
-            await ExecuteShellCommandAsync("docker", $"ps -a --filter id={id.ToString()} --format '{{.Status}}'");
+            await ExecuteShellCommandAsync("docker", $"ps -a --filter id={id} --format '{{.Status}}'");
         if (string.IsNullOrEmpty(result.StdOut.Trim()))
         {
             throw new InvalidOperationException($"Container '{id}' not found.");
@@ -129,10 +130,10 @@ public class DockerService(ILogger<IDockerService> logger) : IDockerService
         return result.StdOut.Trim();
     }
 
-    public async Task<string> GetContainerLogsAsync(long id)
+    public async Task<string> GetContainerLogsAsync(string id)
     {
         logger.LogInformation("Getting logs for container with ID {ContainerId}...", id);
-        var result = await ExecuteShellCommandAsync("docker", $"logs {id.ToString()}");
+        var result = await ExecuteShellCommandAsync("docker", $"logs {id}");
         return result.StdOut;
     }
 

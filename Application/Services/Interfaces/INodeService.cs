@@ -16,7 +16,7 @@ public interface INodeService
     /// </summary>
     /// <param name="id">The Docker container ID or name of the instance to depression.</param>
     /// <returns>A success message indicating the deprovisioning status.</returns>
-    Task<string> DeprovisionContainerAsync(long id);
+    Task<string> DeprovisionContainerAsync(string id);
 
     /// <summary>
     /// Retrieves the current status of a provisioned container.
@@ -24,12 +24,12 @@ public interface INodeService
  
     /// <param name="id"></param>
     /// <returns>The status of the container (e.g., "running", "exited").</returns>
-    Task<string> GetContainerStatusAsync(long id);
+    Task<string> GetContainerStatusAsync(string id);
 
     /// <summary>
     /// Retrieves logs from a provisioned container.
     /// </summary>
     /// <param name="id">The Docker container ID or name of the instance.</param>
     /// <returns>The container logs as a string.</returns>
-    Task<string> GetContainerLogsAsync(long id);
+    Task<string> GetContainerLogsAsync(string id);
 }
