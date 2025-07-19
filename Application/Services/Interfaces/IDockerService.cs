@@ -92,4 +92,18 @@ public interface IDockerService
     /// <param name="protocol">The protocol (e.g., "tcp", "udp"). Defaults to "tcp".</param>
     /// <returns>A message indicating success.</returns>
     Task<string> CloseFirewallPortAsync(int port, string protocol = "tcp");
+
+    /// <summary>
+    /// this for pause specific container
+    /// </summary>
+    /// <param name="idOrName"></param>
+    /// <returns></returns>
+    Task<string> PauseContainerAsync(string idOrName);
+    
+    /// <summary>
+    /// this for unpause a specific container 
+    /// </summary>
+    /// <param name="idOrName"></param>
+    /// <returns></returns>
+    Task<string> UnpauseContainerAsync(string idOrName);
 }

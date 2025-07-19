@@ -32,4 +32,17 @@ public interface INodeService
     /// <param name="id">The Docker container ID or name of the instance.</param>
     /// <returns>The container logs as a string.</returns>
     Task<string> GetContainerLogsAsync(string id);
+    /// <summary>
+    /// this for pause specific container
+    /// </summary>
+    /// <param name="id"></param>
+    /// <returns></returns>
+    Task<string> PauseContainerAsync(string id);
+    
+    /// <summary>
+    /// this for unpause a specific container
+    /// </summary>
+    /// <param name="id"></param>
+    /// <returns></returns>
+    Task<string> ResumeContainerAsync(string id);
 }

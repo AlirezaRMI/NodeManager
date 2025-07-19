@@ -17,8 +17,8 @@ public class NodeService(IDockerService dockerManager, ILogger<INodeService> log
     /// </summary>
     public async Task<ProvisionResponseDto> ProvisionContainerAsync(ProvisionRequestDto request)
     {
-        logger.LogInformation("Starting provisioning process for instance ID: {InstanceId} on host {Host}",
-            request.InstanceId, request.SshHost);
+        logger.LogInformation("Starting provisioning process for instance ID: {InstanceId} on host",
+            request.InstanceId);
 
         string containerName = $"easyhub-xray-{request.InstanceId}";
 
@@ -29,13 +29,10 @@ public class NodeService(IDockerService dockerManager, ILogger<INodeService> log
         try
         {
             assignedInboundPort = await GetUniquePortAndOpenFirewallAsync(MinDynamicPort, MaxDynamicPort,
-                request.SshHost, request.SshPort, request.SshUsername, request.SshPrivateKey, request.SshPassword,
                 62050, 62051);
-            assignedXrayPort = await GetUniquePortAndOpenFirewallAsync(MinDynamicPort, MaxDynamicPort, request.SshHost,
-                request.SshPort, request.SshUsername, request.SshPrivateKey, request.SshPassword, assignedInboundPort,
+            assignedXrayPort = await GetUniquePortAndOpenFirewallAsync(MinDynamicPort, MaxDynamicPort,assignedInboundPort,
                 62050, 62051);
             assignedServerPort = await GetUniquePortAndOpenFirewallAsync(MinDynamicPort, MaxDynamicPort,
-                request.SshHost, request.SshPort, request.SshUsername, request.SshPrivateKey, request.SshPassword,
                 assignedInboundPort, assignedXrayPort, 62050, 62051);
 
             logger.LogInformation("Allocated ports: Inbound={Inbound}, Xray={Xray}, Server={Server}",
@@ -79,8 +76,7 @@ public class NodeService(IDockerService dockerManager, ILogger<INodeService> log
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to create Docker container for instance {InstanceId}.", request.InstanceId);
-            await CloseAllocatedPortsAndFirewallAsync(request.SshHost, request.SshPort, request.SshUsername,
-                request.SshPrivateKey, request.SshPassword, assignedInboundPort, assignedXrayPort, assignedServerPort);
+            await CloseAllocatedPortsAndFirewallAsync(assignedInboundPort, assignedXrayPort, assignedServerPort);
             return new ProvisionResponseDto
             {
                 ProvisionedInstanceId = request.InstanceId, IsSuccess = false,
@@ -125,8 +121,19 @@ public class NodeService(IDockerService dockerManager, ILogger<INodeService> log
         return await dockerManager.GetContainerLogsAsync(containerId);
     }
 
-    private async Task<int> GetUniquePortAndOpenFirewallAsync(int minPort, int maxPort, string host, int sshPort,
-        string sshUsername, string privateKey, string? passphrase, params int[] excludedPorts)
+    public Task<string> PauseContainerAsync(string id)
+    {
+        logger.LogInformation($"pause container by id : {id}");
+        return dockerManager.PauseContainerAsync(id);
+    }
+
+    public Task<string> ResumeContainerAsync(string id)
+    {
+        logger.LogInformation($"resume container by id : {id}");
+        return dockerManager.UnpauseContainerAsync(id);
+    }
+
+    private async Task<int> GetUniquePortAndOpenFirewallAsync(int minPort, int maxPort , params int[] excludedPorts)
     {
         var maxAttempts = 100;
         for (var i = 0; i < maxAttempts; i++)
@@ -144,8 +151,7 @@ public class NodeService(IDockerService dockerManager, ILogger<INodeService> log
         throw new InvalidOperationException("Failed to find a unique available port after multiple attempts.");
     }
 
-    private async Task CloseAllocatedPortsAndFirewallAsync(string host, int sshPort, string sshUsername,
-        string privateKey, string? passphrase, params int[] portsToClose)
+    private async Task CloseAllocatedPortsAndFirewallAsync(params int[] portsToClose)
     {
         foreach (var port in portsToClose)
         {
