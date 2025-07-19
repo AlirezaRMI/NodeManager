@@ -1,85 +1,52 @@
 ﻿#!/usr/bin/env bash
 set -e
 
+install_package() {
+  if ! command -v "$1" &>/dev/null; then
+    echo "Installing $1 ..."
+    sudo apt-get update -y
+    sudo apt-get install -y "$2"
+  fi
+}
+
+install_package docker "ca-certificates curl gnupg software-properties-common docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin"
+install_package git git
+
+sudo systemctl enable --now docker
+
 REPO_URL="https://github.com/AlirezaRMI/NodeManager.git"
 INSTALL_DIR="/opt/nodemanager"
-DATA_DIR="/var/lib/marzban-node"      
-DOCKER_SOCK="/var/run/docker.sock"
-
-if ! command -v docker &>/dev/null; then
-  echo "🔧 Docker not found. Installing..."
-  sudo apt-get update
-  sudo apt-get install -y ca-certificates curl gnupg software-properties-common
-  sudo install -m 0755 -d /etc/apt/keyrings
-  curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-  echo \
-    "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
-    $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
-    sudo tee /etc/apt/sources.list.d/docker.list >/dev/null
-  sudo apt-get update
-  sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-fi
-sudo systemctl enable docker.service
-
-if ! command -v git &>/dev/null; then
-  echo "🔧 Git not found. Installing..."
-  sudo apt-get update
-  sudo apt-get install -y git
-fi
-
-sudo mkdir -p "$DATA_DIR"
-sudo chown 1000:1000 "$DATA_DIR"
 
 if [ ! -d "$INSTALL_DIR" ]; then
-  echo "⬇️  Cloning NodeManager..."
   sudo git clone "$REPO_URL" "$INSTALL_DIR"
 else
-  echo "🔄 Pulling latest NodeManager changes..."
-  sudo git -C "$INSTALL_DIR" pull
+  sudo git -C "$INSTALL_DIR" pull --ff-only
 fi
+
 
 cd "$INSTALL_DIR"
 
+export NM_API_PORT=5000
+export NM_GRPC_PORT=5001
 
-if [ -f "compose.yml" ]; then
-  echo "📦 Running docker compose for NodeManager stack…"
-  sudo docker compose up -d
-else
-  echo "🛠  Building NodeManager image…"
-  sudo docker build -t nodemanager:latest .
-
-
-  if sudo docker ps -a --format '{{.Names}}' | grep -qw nodemanager; then
-    sudo docker rm -f nodemanager || true
-  fi
-
-  echo "🚀 Starting NodeManager container…"
-  sudo docker run -d --name nodemanager --restart=always \
-    -p 5000:5000 -p 5001:5001 \
-    -v "$DOCKER_SOCK":"$DOCKER_SOCK" \
-    nodemanager:latest
-fi
-
-if ! sudo docker ps -a --format '{{.Names}}' | grep -qw marzban-node; then
-  echo "🚀 Starting Marzban-Node container…"
-  sudo docker run -d --name marzban-node --restart=always \
-    -p 8444:8444 \
-    -v "$DATA_DIR":/var/lib/marzban-node \
-    gozargah/marzban-node:latest
-fi
+sudo docker compose pull  
+sudo docker compose up -d --build
 
 SERVICE_FILE="/etc/systemd/system/nodemanager.service"
+
 sudo tee "$SERVICE_FILE" >/dev/null <<EOF
 [Unit]
-Description=NodeManager Docker Container
+Description=NodeManager (docker compose)
 After=docker.service
 Requires=docker.service
 
 [Service]
-Restart=always
-ExecStartPre=-/usr/bin/docker rm -f nodemanager
-ExecStart=/usr/bin/docker start -a nodemanager
-ExecStop=/usr/bin/docker stop -t 10 nodemanager
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=$INSTALL_DIR
+ExecStart=/usr/bin/docker compose up -d
+ExecStop=/usr/bin/docker compose down
+TimeoutStartSec=0
 
 [Install]
 WantedBy=multi-user.target
@@ -89,7 +56,4 @@ sudo systemctl daemon-reload
 sudo systemctl enable nodemanager.service
 sudo systemctl restart nodemanager.service
 
-echo "✅  NodeManager & Marzban-Node deployed successfully."
-echo "   • NodeManager API:  http://<host>:5000/"
-echo "   • Marzban-Node:     https://<host>:8444/"
-echo "👉  Check status with: sudo systemctl status nodemanager"
+echo "✅  NodeManager systemctl status nodemanager "
