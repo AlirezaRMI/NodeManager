@@ -4,8 +4,18 @@ set -e
 install_package() {
   if ! command -v "$1" &>/dev/null; then
     echo "Installing $1 ..."
-    sudo apt-get update -y
-    sudo apt-get install -y "$2"
+    sudo apt-get update
+    
+    sudo apt-get install -y \
+        ca-certificates \
+        curl \
+        gnupg \
+        software-properties-common \
+        docker-ce \
+        docker-ce-cli \
+        containerd.io \
+        docker-buildx-plugin \
+        docker-compose-plugin
   fi
 }
 
