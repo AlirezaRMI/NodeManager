@@ -1,19 +1,17 @@
-﻿using Api.Filters;
+﻿using Api.Filters; // Assuming you have this for ApiResult
 using Application.Services.Interfaces;
 using Domain.Models.Provision;
 using Microsoft.AspNetCore.Mvc;
-
 
 namespace Api.Controllers
 {
     [ApiController]
     [Route("api/provisioning")]
-    public class ProvisioningController(INodeService service, ILogger<ProvisioningController> logger) : ControllerBase
+    public class ProvisioningController(INodeService service) : ApiBaseController
     {
         [HttpPost("container")]
-        [EndpointName("create container")]
+        [EndpointName("create Container")]
         [EndpointSummary("creates a new Xray container instance for a node.")]
-        [ProducesResponseType(typeof(ProvisionResponseDto), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ProvisionResponseDto), StatusCodes.Status201Created)]
         [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(typeof(string), StatusCodes.Status500InternalServerError)]
@@ -22,61 +20,56 @@ namespace Api.Controllers
             var response = await service.ProvisionContainerAsync(request);
             return Ok(response);
         }
-
-        [HttpDelete("container/{containerId}")]
-        [EndpointName("deprovision container")]
-        [EndpointSummary("sops and deletes an Xray container instance.")]
-        [ProducesResponseType(typeof(ApiResult<string>), StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(ApiResult), StatusCodes.Status404NotFound)]
-        [ProducesResponseType(typeof(ApiResult), StatusCodes.Status500InternalServerError)]
-        public async Task<IActionResult> DeprovisionContainer([FromRoute]string containerId)
+        
+        [HttpDelete("container/{containerId}")] 
+        [EndpointName("deprovision Container")]
+        [EndpointSummary("stops and deletes an Xray container instance.")]
+        [ProducesResponseType(typeof(string), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(string), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> DeprovisionContainer([FromRoute] string containerId) 
         {
             var message = await service.DeprovisionContainerAsync(containerId);
             return Ok(message);
         }
-
-        [HttpGet("container/{containerId}/status")]
-        [EndpointName("get container status")]
+        
+        [HttpGet("container/{containerId}/status")] 
+        [EndpointName("get Container Status")]
         [EndpointSummary("retrieves the current status of an Xray container instance.")]
-        [ProducesResponseType(typeof(ApiResult<string>), StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(ApiResult), StatusCodes.Status404NotFound)]
-        [ProducesResponseType(typeof(ApiResult), StatusCodes.Status500InternalServerError)]
-        public async Task<IActionResult> GetContainerStatus([FromRoute]string containerId)
+        [ProducesResponseType(typeof(string), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(string), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> GetContainerStatus([FromRoute] string containerId)
         {
             var status = await service.GetContainerStatusAsync(containerId);
             return Ok(status);
         }
 
         [HttpGet("container/{containerId}/logs")]
-        [EndpointName("get container logs")]
+        [EndpointName("get Container Logs")]
         [EndpointSummary("retrieves logs from an Xray container instance.")]
-        [ProducesResponseType(typeof(ApiResult<string>), StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(ApiResult), StatusCodes.Status404NotFound)]
-        [ProducesResponseType(typeof(ApiResult), StatusCodes.Status500InternalServerError)]
-        public async Task<IActionResult> GetContainerLogs([FromRoute]string containerId)
+        [ProducesResponseType(typeof(string), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(string), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> GetContainerLogs([FromRoute] string containerId)
         {
             string logs = await service.GetContainerLogsAsync(containerId);
             return Ok(logs);
         }
-
-        [HttpPost("pause")]
-        [EndpointName("pause container")]
-        [EndpointSummary("pauses the container to be paused.")]
-        [ProducesResponseType(typeof(ApiResult), StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(ApiResult), StatusCodes.Status404NotFound)]
-        [ProducesResponseType(typeof(ApiResult), StatusCodes.Status500InternalServerError)]
-        public async Task<IActionResult> PauseContainer([FromRoute]string containerId)
+        
+        [HttpPost("container/{containerId}/pause")]
+        [EndpointName("pause Container")]
+        [EndpointSummary("pauses the specified container.")]
+        [ProducesResponseType(typeof(string), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(string), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> PauseContainer([FromRoute] string containerId)
         {
             return Ok(await service.PauseContainerAsync(containerId));
         }
-
-        [HttpPost("resume")]
-        [EndpointName("resume container")]
-        [EndpointSummary("resumes the container to be resumed.")]
-        [ProducesResponseType(typeof(ApiResult), StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(ApiResult), StatusCodes.Status404NotFound)]
-        [ProducesResponseType(typeof(ApiResult), StatusCodes.Status500InternalServerError)]
-        public async Task<IActionResult> ResumeContainer([FromRoute]string containerId)
+        
+        [HttpPost("container/{containerId}/resume")]
+        [EndpointName("resume Container")]
+        [EndpointSummary("resumes (unpauses) the specified container.")]
+        [ProducesResponseType(typeof(string), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(string), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> ResumeContainer([FromRoute] string containerId)
         {
             return Ok(await service.ResumeContainerAsync(containerId));
         }

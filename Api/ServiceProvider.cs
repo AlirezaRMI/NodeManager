@@ -18,7 +18,6 @@ public static class ServiceProvider
 
         // Provides access to HttpContext for IUserContextService
         services.AddHttpContextAccessor();
-        services.AddOpenApi();
         services.AddControllers();
         services.AddEndpointsApiExplorer();
         services.AddSwaggerGen(options =>

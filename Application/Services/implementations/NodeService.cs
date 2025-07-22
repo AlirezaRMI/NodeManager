@@ -6,92 +6,92 @@ namespace Application.Services.implementations;
 
 public class NodeService(IDockerService dockerManager, ILogger<INodeService> logger) : INodeService
 {
-    private readonly Random _random = new Random();
-
-    private const int MinDynamicPort = 20000;
-    private const int MaxDynamicPort = 60000;
-
-
-    /// <summary>
-    /// Orchestrates the process of provisioning a new Xray container instance.
-    /// </summary>
     public async Task<ProvisionResponseDto> ProvisionContainerAsync(ProvisionRequestDto request)
     {
-        logger.LogInformation("Starting provisioning process for instance ID: {InstanceId} on host {Host}",
-            request.InstanceId, request.SshHost);
+        logger.LogInformation("Starting provisioning process for instance ID: {InstanceId}", request.InstanceId);
 
-        string containerName = $"easyhub-xray-{request.InstanceId}";
-
-        int assignedInboundPort;
-        int assignedXrayPort;
-        int assignedServerPort;
-
-        try
-        {
-            assignedInboundPort = await GetUniquePortAndOpenFirewallAsync(MinDynamicPort, MaxDynamicPort,
-                request.SshHost, request.SshPort, request.SshUsername, request.SshPrivateKey, request.SshPassword,
-                62050, 62051);
-            assignedXrayPort = await GetUniquePortAndOpenFirewallAsync(MinDynamicPort, MaxDynamicPort, request.SshHost,
-                request.SshPort, request.SshUsername, request.SshPrivateKey, request.SshPassword, assignedInboundPort,
-                62050, 62051);
-            assignedServerPort = await GetUniquePortAndOpenFirewallAsync(MinDynamicPort, MaxDynamicPort,
-                request.SshHost, request.SshPort, request.SshUsername, request.SshPrivateKey, request.SshPassword,
-                assignedInboundPort, assignedXrayPort, 62050, 62051);
-
-            logger.LogInformation("Allocated ports: Inbound={Inbound}, Xray={Xray}, Server={Server}",
-                assignedInboundPort, assignedXrayPort, assignedServerPort);
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to allocate unique ports for instance {InstanceId}.", request.InstanceId);
-            return new ProvisionResponseDto
-            {
-                ProvisionedInstanceId = request.InstanceId, IsSuccess = false,
-                ErrorMessage = $"Failed to allocate ports: {ex.Message}"
-            };
-        }
-
-        string xrayUserUuid = Guid.NewGuid().ToString();
-
-        var containerEnvVars = new Dictionary<string, string>
-        {
-            { "XRAY_UUID", xrayUserUuid },
-            { "XRAY_INBOUND_PORT", assignedInboundPort.ToString() },
-            { "XRAY_XRAY_PORT", assignedXrayPort.ToString() },
-            { "XRAY_SERVER_PORT", assignedServerPort.ToString() },
-            { "XRAY_LOG_LEVEL", "warning" },
-        };
-
+        string containerName = $"easyhub-{request.InstanceId}";
+        int assignedInboundPort = request.InboundPort ?? throw new InvalidOperationException("Inbound Port is required.");
+        int assignedXrayPort = request.XrayPort ?? throw new InvalidOperationException("Xray Port is required.");
+        int assignedServerPort = request.ServerPort ?? throw new InvalidOperationException("Server Port is required.");
         string containerDockerId;
+        string xrayUserUuid = "UUID_NOT_EXTRACTED";
+
         try
         {
+            // Step 1: Host setup (directories, files, firewall)
+            string instanceDataPath = $"/var/lib/marzban-node-{request.InstanceId}";
+            await dockerManager.CreateDirectoryOnHostAsync(instanceDataPath);
+            await dockerManager.WriteFileOnHostAsync(Path.Combine(instanceDataPath, "ssl_client_cert.pem"), request.SshPrivateKey);
+            await dockerManager.OpenFirewallPortAsync(assignedInboundPort);
+            await dockerManager.OpenFirewallPortAsync(assignedXrayPort);
+            await dockerManager.OpenFirewallPortAsync(assignedServerPort);
+
+            // Step 2: Prepare container parameters
+            var envVars = new Dictionary<string, string>
+            {
+                { "SERVICE_PORT", assignedInboundPort.ToString() },
+                { "XRAY_API_PORT", assignedXrayPort.ToString() },
+                { "SERVICE_PROTOCOL", "rest" },
+                { "SSL_CLIENT_CERT_FILE", "/var/lib/marzban-node/ssl_client_cert.pem" }
+            };
+            var volumes = new List<string>
+            {
+                $"{instanceDataPath}:/var/lib/marzban-node",
+                $"{instanceDataPath}:/var/lib/marzban"
+            };
+
+            // Step 3: Create and Start the container
             containerDockerId = await dockerManager.CreateContainerAsync(
-                request.XrayContainerImage,
-                containerName,
-                [
-                    $"{assignedInboundPort}:{assignedInboundPort}", $"{assignedXrayPort}:{assignedXrayPort}",
-                    $"{assignedServerPort}:{assignedServerPort}"
-                ],
-                containerEnvVars,
-                command: null
+                imageName: request.XrayContainerImage,
+                containerName: containerName,
+                portMappings: new List<string>(), // Not needed for host network mode
+                environmentVariables: envVars,
+                volumeMappings: volumes,
+                networkMode: "host"
             );
+            await dockerManager.StartContainerAsync(containerDockerId);
+            logger.LogInformation("Container '{Name}' created and started with ID: {Id}", containerName, containerDockerId);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to create Docker container for instance {InstanceId}.", request.InstanceId);
-            await CloseAllocatedPortsAndFirewallAsync(request.SshHost, request.SshPort, request.SshUsername,
-                request.SshPrivateKey, request.SshPassword, assignedInboundPort, assignedXrayPort, assignedServerPort);
-            return new ProvisionResponseDto
-            {
-                ProvisionedInstanceId = request.InstanceId, IsSuccess = false,
-                ErrorMessage = $"Failed to create container: {ex.Message}"
-            };
+            await CloseAllocatedPortsAndFirewallAsync(assignedInboundPort, assignedXrayPort, assignedServerPort);
+            return new ProvisionResponseDto { IsSuccess = false, ErrorMessage = $"Failed to create container: {ex.Message}" };
         }
 
-        logger.LogInformation(
-            "Successfully provisioned container {ContainerId} for instance {InstanceId} with ports Inbound={Inbound}, Xray={Xray}, Server={Server}",
-            containerDockerId, request.InstanceId, assignedInboundPort, assignedXrayPort, assignedServerPort);
+        // Step 4: Extract UUID from the running container
+        try
+        {
+            const int maxAttempts = 10;
+            var delayBetweenAttempts = TimeSpan.FromSeconds(2);
+            for (int attempt = 1; attempt <= maxAttempts; attempt++)
+            {
+                var lsOutput = await dockerManager.ExecuteCommandInContainerAsync(containerDockerId, new[] { "ls", "/var/lib/marzban/users" });
+                if (!string.IsNullOrEmpty(lsOutput))
+                {
+                    var userJsonFile = lsOutput.Trim().Split('\n').FirstOrDefault(f => f.EndsWith(".json"));
+                    if (userJsonFile != null)
+                    {
+                        var uuidOutput = await dockerManager.ExecuteCommandInContainerAsync(containerDockerId, new[] { "jq", "-r", ".id", $"/var/lib/marzban/users/{userJsonFile}" });
+                        if (!string.IsNullOrEmpty(uuidOutput))
+                        {
+                            xrayUserUuid = uuidOutput.Trim();
+                            logger.LogInformation("Successfully extracted UUID on attempt {Attempt}: {UUID}", attempt, xrayUserUuid);
+                            break;
+                        }
+                    }
+                }
+                if (attempt < maxAttempts) await Task.Delay(delayBetweenAttempts);
+                else logger.LogWarning("Failed to extract UUID after {MaxAttempts} attempts.", maxAttempts);
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "An error occurred while extracting UUID from container {ContainerId}.", containerDockerId);
+        }
 
+        // Step 5: Return the final response
         return new ProvisionResponseDto
         {
             ProvisionedInstanceId = request.InstanceId,
@@ -107,56 +107,34 @@ public class NodeService(IDockerService dockerManager, ILogger<INodeService> log
     public async Task<string> DeprovisionContainerAsync(string containerId)
     {
         logger.LogInformation("Deprovisioning container {ContainerId}...", containerId);
-
         await dockerManager.StopContainerAsync(containerId);
         await dockerManager.DeleteContainerAsync(containerId);
-
         logger.LogInformation("Container {ContainerId} deprovisioned.", containerId);
         return $"Container {containerId} deprovisioned.";
     }
 
-    public async Task<string> GetContainerStatusAsync(string containerId)
-    {
-        return await dockerManager.GetContainerStatusAsync(containerId);
-    }
+    public Task<string> GetContainerStatusAsync(string containerId) => dockerManager.GetContainerStatusAsync(containerId);
+    public Task<string> GetContainerLogsAsync(string containerId) => dockerManager.GetContainerLogsAsync(containerId);
 
-    public async Task<string> GetContainerLogsAsync(string containerId)
-    {
-        return await dockerManager.GetContainerLogsAsync(containerId);
-    }
-
-    private async Task<int> GetUniquePortAndOpenFirewallAsync(int minPort, int maxPort, string host, int sshPort,
-        string sshUsername, string privateKey, string? passphrase, params int[] excludedPorts)
-    {
-        var maxAttempts = 100;
-        for (var i = 0; i < maxAttempts; i++)
-        {
-            var candidatePort = _random.Next(minPort, maxPort + 1);
-
-            if (excludedPorts.Contains(candidatePort)) continue;
-
-            if (!await dockerManager
-                    .IsPortAvailableAsync(candidatePort)) continue;
-            await dockerManager.OpenFirewallPortAsync(candidatePort);
-            return candidatePort;
-        }
-
-        throw new InvalidOperationException("Failed to find a unique available port after multiple attempts.");
-    }
-
-    private async Task CloseAllocatedPortsAndFirewallAsync(string host, int sshPort, string sshUsername,
-        string privateKey, string? passphrase, params int[] portsToClose)
+    private async Task CloseAllocatedPortsAndFirewallAsync(params int[] portsToClose)
     {
         foreach (var port in portsToClose)
         {
-            try
-            {
-                await dockerManager.CloseFirewallPortAsync(port);
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Failed to close port {Port} in firewall during error handling.", port);
-            }
+            try { await dockerManager.CloseFirewallPortAsync(port); }
+            catch (Exception ex) { logger.LogError(ex, "Failed to close port {Port} in firewall.", port); }
         }
+    }
+    
+    public async Task<string> PauseContainerAsync(string containerId)
+    {
+        await dockerManager.PauseContainerAsync(containerId);
+        return $"Container {containerId} paused.";
+    }
+
+    public async Task<string> ResumeContainerAsync(string containerId)
+    {
+        // Docker's term is "Unpause", so we call that method.
+        await dockerManager.UnpauseContainerAsync(containerId);
+        return $"Container {containerId} resumed.";
     }
 }
