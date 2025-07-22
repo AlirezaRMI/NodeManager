@@ -161,6 +161,10 @@
               "target": "Package",
               "version": "[15.0.1, )"
             },
+            "Docker.DotNet": {
+              "target": "Package",
+              "version": "[3.125.15, )"
+            },
             "FluentValidation": {
               "target": "Package",
               "version": "[12.0.0, )"
