@@ -166,4 +166,34 @@ public class DockerService(IDockerClient dockerClient, ILogger<IDockerService> l
 
         return (Encoding.UTF8.GetString(stdoutBuffer.ToArray()), Encoding.UTF8.GetString(stderrBuffer.ToArray()));
     }
+    
+    public async Task<string> PauseContainerAsync(string idOrName)
+    {
+        logger.LogInformation("Pausing container '{ContainerIdOrName}'...", idOrName);
+        var result = await ExecuteShellCommandAsync("docker", $"pause {idOrName}");
+
+        if (result.ExitCode != 0)
+        {
+            logger.LogError("Failed to pause container '{ContainerIdOrName}'. Stderr: {StdErr}", idOrName, result.StdErr);
+            throw new InvalidOperationException($"Failed to pause container {idOrName}: {result.StdErr}");
+        }
+
+        logger.LogInformation("Container '{ContainerIdOrName}' paused successfully.", idOrName);
+        return $"Container {idOrName} paused.";
+    }
+    
+    public async Task<string> UnpauseContainerAsync(string idOrName)
+    {
+        logger.LogInformation("Unpausing container '{ContainerIdOrName}'...", idOrName);
+        var result = await ExecuteShellCommandAsync("docker", $"unpause {idOrName}");
+
+        if (result.ExitCode != 0)
+        {
+            logger.LogError("Failed to unpause container '{ContainerIdOrName}'. Stderr: {StdErr}", idOrName, result.StdErr);
+            throw new InvalidOperationException($"Failed to unpause container {idOrName}: {result.StdErr}");
+        }
+
+        logger.LogInformation("Container '{ContainerIdOrName}' unpaused successfully.", idOrName);
+        return $"Container {idOrName} unpaused.";
+    }
 }
