@@ -31,8 +31,4 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     sudo && \
     rm -rf /var/lib/apt/lists/*
 
-
-EXPOSE 80 
-EXPOSE 443
-
 ENTRYPOINT ["dotnet", "Api.dll"]

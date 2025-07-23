@@ -7,7 +7,7 @@ namespace Api.Controllers
 {
     [ApiController]
     [Route("api/provisioning")]
-    public class ProvisioningController(INodeService service) : ApiBaseController
+    public class ProvisioningController(INodeService service) : ControllerBase
     {
         [HttpPost("container")]
         [EndpointName("create Container")]
