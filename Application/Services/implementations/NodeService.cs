@@ -11,9 +11,9 @@ public class NodeService(IDockerService dockerManager, ILogger<INodeService> log
         logger.LogInformation("Starting provisioning process for instance ID: {InstanceId}", request.InstanceId);
 
         string containerName = $"easyhub-{request.InstanceId}";
-        int assignedInboundPort = request.InboundPort ?? throw new InvalidOperationException("Inbound Port is required.");
-        int assignedXrayPort = request.XrayPort ?? throw new InvalidOperationException("Xray Port is required.");
-        int assignedServerPort = request.ServerPort ?? throw new InvalidOperationException("Server Port is required.");
+        int assignedInboundPort = request.InboundPort;
+        int assignedXrayPort = request.XrayPort;
+        int assignedServerPort = request.ServerPort;
         string containerDockerId;
         string xrayUserUuid = "UUID_NOT_EXTRACTED";
 

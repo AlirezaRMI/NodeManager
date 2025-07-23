@@ -28,27 +28,15 @@ public class ProvisionValidator : AbstractValidator<ProvisionRequestDto>
         
         RuleFor(x => x.InboundPort)
             .InclusiveBetween(1024, 65535)
-            .WithMessage("Suggested Inbound Port must be between 1024 and 65535.")
-            .When(x => x.InboundPort.HasValue); 
+            .WithMessage("Suggested Inbound Port must be between 1024 and 65535."); 
         
         RuleFor(x => x.XrayPort)
             .InclusiveBetween(1024, 65535)
-            .WithMessage("Suggested Xray Port must be between 1024 and 65535.")
-            .When(x => x.XrayPort.HasValue);
+            .WithMessage("Suggested Xray Port must be between 1024 and 65535.");
         
         RuleFor(x => x.ServerPort)
             .InclusiveBetween(1024, 65535)
-            .WithMessage("Suggested Server Port must be between 1024 and 65535.")
-            .When(x => x.ServerPort.HasValue);
+            .WithMessage("Suggested Server Port must be between 1024 and 65535.");
         
-        RuleFor(x => x)
-            .Must(x =>
-            {
-                var usedPorts = new HashSet<int>();
-                if (x.InboundPort.HasValue && !usedPorts.Add(x.InboundPort.Value)) return false;
-                if (x.XrayPort.HasValue && !usedPorts.Add(x.XrayPort.Value)) return false;
-                if (x.ServerPort.HasValue && !usedPorts.Add(x.ServerPort.Value)) return false;
-                return true; 
-            }).WithMessage("Suggested ports cannot conflict with each other.");
     }
 }

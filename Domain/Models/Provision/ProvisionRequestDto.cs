@@ -10,10 +10,10 @@ public class ProvisionRequestDto
 
     public long CustomerId { get; set; }
 
-    public int? InboundPort { get; set; }
+    public int InboundPort { get; set; }
 
-    public int? XrayPort { get; set; }
+    public int XrayPort { get; set; }
 
-    public int? ServerPort { get; set; }
+    public int ServerPort { get; set; }
     
 }
