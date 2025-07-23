@@ -6,92 +6,86 @@ namespace Application.Services.implementations;
 
 public class NodeService(IDockerService dockerManager, ILogger<INodeService> logger) : INodeService
 {
+    
     public async Task<ProvisionResponseDto> ProvisionContainerAsync(ProvisionRequestDto request)
     {
         logger.LogInformation("Starting provisioning process for instance ID: {InstanceId}", request.InstanceId);
 
-        string containerName = $"easyhub-{request.InstanceId}";
-        int assignedInboundPort = request.InboundPort;
-        int assignedXrayPort = request.XrayPort;
-        int assignedServerPort = request.ServerPort;
+        string containerName = $"easyhub-xray-{request.InstanceId}";
+        int assignedInboundPort = request.InboundPort; 
+        int assignedXrayPort = request.XrayPort;      
+        int assignedServerPort = request.ServerPort;  
         string containerDockerId;
         string xrayUserUuid = "UUID_NOT_EXTRACTED";
+        
+        string instanceSpecificDataDirOnHost = $"/var/lib/easyhub-instance-data/{request.InstanceId}";
+        string instanceSslDataPathOnHost = Path.Combine(instanceSpecificDataDirOnHost, "ssl"); 
 
-        try
-        {
-            // Step 1: Host setup (directories, files, firewall)
-            string instanceDataPath = $"/var/lib/marzban-node-{request.InstanceId}";
-            await dockerManager.CreateDirectoryOnHostAsync(instanceDataPath);
-            await dockerManager.WriteFileOnHostAsync(Path.Combine(instanceDataPath, "ssl_client_cert.pem"), request.SshPrivateKey);
+
+        string clientCertFilePathOnHost = Path.Combine(instanceSslDataPathOnHost, "ssl_client_cert.pem");
+        string clientKeyFilePathOnHost = Path.Combine(instanceSslDataPathOnHost, "ssl_client_key.pem");
+        
+            await dockerManager.CreateDirectoryOnHostAsync(instanceSslDataPathOnHost);
+            logger.LogInformation("Directory created on host: {Path}", instanceSslDataPathOnHost);
+            
+            if (!string.IsNullOrEmpty(request.SshPrivateKey))
+            {
+                await dockerManager.WriteFileOnHostAsync(clientCertFilePathOnHost, request.SshPrivateKey);
+                logger.LogInformation("Client cert written to host: {Path}", clientCertFilePathOnHost);
+            }
+            else
+            {
+                logger.LogWarning("SslCertificateContent is null or empty. Client cert file will not be written.");
+            }
+
+            if (!string.IsNullOrEmpty(request.SshPrivateKey))
+            {
+                await dockerManager.WriteFileOnHostAsync(clientKeyFilePathOnHost, request.SshPrivateKey);
+                logger.LogInformation("Client key written to host: {Path}", clientKeyFilePathOnHost);
+            }
+            else
+            {
+                logger.LogWarning("SslKeyContent is null or empty. Client key file will not be written.");
+            }
+       
+            
             await dockerManager.OpenFirewallPortAsync(assignedInboundPort);
             await dockerManager.OpenFirewallPortAsync(assignedXrayPort);
             await dockerManager.OpenFirewallPortAsync(assignedServerPort);
-
-            // Step 2: Prepare container parameters
+            logger.LogInformation("Firewall ports opened: {Inbound}, {Xray}, {Server}", assignedInboundPort, assignedXrayPort, assignedServerPort);
+            
             var envVars = new Dictionary<string, string>
             {
-                { "SERVICE_PORT", assignedInboundPort.ToString() },
+                { "SERVICE_PORT", assignedInboundPort.ToString() }, 
                 { "XRAY_API_PORT", assignedXrayPort.ToString() },
                 { "SERVICE_PROTOCOL", "rest" },
-                { "SSL_CLIENT_CERT_FILE", "/var/lib/marzban-node/ssl_client_cert.pem" }
+                { "SSL_CLIENT_CERT_FILE", "/var/lib/marzban-node/ssl_client_cert.pem" },
             };
+            
             var volumes = new List<string>
             {
-                $"{instanceDataPath}:/var/lib/marzban-node",
-                $"{instanceDataPath}:/var/lib/marzban"
+                $"{clientCertFilePathOnHost}:/var/lib/marzban-node/ssl_client_cert.pem",
+                $"{clientKeyFilePathOnHost}:/var/lib/marzban-node/ssl_client_key.pem",
             };
 
-            // Step 3: Create and Start the container
+         
             containerDockerId = await dockerManager.CreateContainerAsync(
                 imageName: request.XrayContainerImage,
                 containerName: containerName,
-                portMappings: new List<string>(), // Not needed for host network mode
+                portMappings: new List<string> { 
+                    $"{assignedInboundPort}:443/tcp",
+                    $"{assignedXrayPort}:8080/tcp",   
+                    $"{assignedServerPort}:443/tcp"  
+                }, 
                 environmentVariables: envVars,
-                volumeMappings: volumes,
-                networkMode: "host"
+                volumeMappings: volumes
             );
             await dockerManager.StartContainerAsync(containerDockerId);
             logger.LogInformation("Container '{Name}' created and started with ID: {Id}", containerName, containerDockerId);
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to create Docker container for instance {InstanceId}.", request.InstanceId);
-            await CloseAllocatedPortsAndFirewallAsync(assignedInboundPort, assignedXrayPort, assignedServerPort);
-            return new ProvisionResponseDto { IsSuccess = false, ErrorMessage = $"Failed to create container: {ex.Message}" };
-        }
+      
+ 
 
-        // Step 4: Extract UUID from the running container
-        try
-        {
-            const int maxAttempts = 10;
-            var delayBetweenAttempts = TimeSpan.FromSeconds(2);
-            for (int attempt = 1; attempt <= maxAttempts; attempt++)
-            {
-                var lsOutput = await dockerManager.ExecuteCommandInContainerAsync(containerDockerId, new[] { "ls", "/var/lib/marzban/users" });
-                if (!string.IsNullOrEmpty(lsOutput))
-                {
-                    var userJsonFile = lsOutput.Trim().Split('\n').FirstOrDefault(f => f.EndsWith(".json"));
-                    if (userJsonFile != null)
-                    {
-                        var uuidOutput = await dockerManager.ExecuteCommandInContainerAsync(containerDockerId, new[] { "jq", "-r", ".id", $"/var/lib/marzban/users/{userJsonFile}" });
-                        if (!string.IsNullOrEmpty(uuidOutput))
-                        {
-                            xrayUserUuid = uuidOutput.Trim();
-                            logger.LogInformation("Successfully extracted UUID on attempt {Attempt}: {UUID}", attempt, xrayUserUuid);
-                            break;
-                        }
-                    }
-                }
-                if (attempt < maxAttempts) await Task.Delay(delayBetweenAttempts);
-                else logger.LogWarning("Failed to extract UUID after {MaxAttempts} attempts.", maxAttempts);
-            }
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex, "An error occurred while extracting UUID from container {ContainerId}.", containerDockerId);
-        }
-
-        // Step 5: Return the final response
+    
         return new ProvisionResponseDto
         {
             ProvisionedInstanceId = request.InstanceId,
@@ -103,7 +97,8 @@ public class NodeService(IDockerService dockerManager, ILogger<INodeService> log
             XrayUserUuid = xrayUserUuid,
         };
     }
-
+    
+    
     public async Task<string> DeprovisionContainerAsync(string containerId)
     {
         logger.LogInformation("Deprovisioning container {ContainerId}...", containerId);
@@ -133,7 +128,6 @@ public class NodeService(IDockerService dockerManager, ILogger<INodeService> log
 
     public async Task<string> ResumeContainerAsync(string containerId)
     {
-        // Docker's term is "Unpause", so we call that method.
         await dockerManager.UnpauseContainerAsync(containerId);
         return $"Container {containerId} resumed.";
     }
