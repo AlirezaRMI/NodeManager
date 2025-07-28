@@ -25,8 +25,6 @@ public static class ServiceProvider
             options.SwaggerDoc("v1", new OpenApiInfo { Title = "Node Management API", Version = "v1" });
         });
 
-        
-
         services.AddHttpClient();
 
         return services;

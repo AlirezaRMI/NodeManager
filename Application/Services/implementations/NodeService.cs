@@ -10,6 +10,8 @@ public class NodeService(IDockerService dockerManager, ILogger<INodeService> log
     public async Task<ProvisionResponseDto> ProvisionContainerAsync(ProvisionRequestDto request)
     {
         logger.LogInformation("Starting provisioning process for instance ID: {InstanceId}", request.InstanceId);
+        if (request.InboundPort <= 0 || request.XrayPort <= 0 || request.ApiPort <= 0)
+            throw new ArgumentException("All requested ports must be > 0");
 
         string containerName = $"easyhub-xray-{request.InstanceId}";
         int assignedInboundPort = request.InboundPort; 
@@ -75,7 +77,7 @@ public class NodeService(IDockerService dockerManager, ILogger<INodeService> log
                 portMappings: new List<string> { 
                     $"{assignedInboundPort}:443/tcp",
                     $"{assignedXrayPort}:8080/tcp",   
-                    $"{assignedServerPort}:443/tcp"  
+                    $"{assignedServerPort}:8484/tcp"  
                 }, 
                 environmentVariables: envVars,
                 volumeMappings: volumes
