@@ -12,6 +12,7 @@ services:
      
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      - /var/lib/easyhub-instance-data:/var/lib/easyhub-instance-data
     restart: always
     
     user: root
