@@ -1,6 +1,4 @@
-﻿version: "3.9"
-
-services:
+﻿services:
   nm-api:
     build:
       context: .
@@ -11,8 +9,8 @@ services:
       ASPNETCORE_ENVIRONMENT: "Production"
      
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
       - /var/lib/easyhub-instance-data:/var/lib/easyhub-instance-data
+      - /var/run/docker.sock:/var/run/docker.sock
     restart: always
     
     user: root

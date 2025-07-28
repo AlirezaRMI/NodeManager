@@ -13,10 +13,21 @@ public class DockerService(IDockerClient dockerClient, ILogger<IDockerService> l
     public async Task<string> CreateContainerAsync(string imageName, string containerName, List<string> portMappings,
         Dictionary<string, string> environmentVariables, List<string> volumeMappings, string? command = null, string networkMode = "bridge")
     {
-        var portBindings = portMappings.ToDictionary(
-            p => $"{p.Split(':')[1]}/tcp",
-            p => (IList<PortBinding>)new List<PortBinding> { new() { HostPort = p.Split(':')[0] } }
-        );
+        var portBindings = new Dictionary<string, IList<PortBinding>>();
+
+        foreach (var mapping in portMappings)
+        {
+            var split = mapping.Split(':');
+            var hostPort = split[0];
+            var containerPortProto = split[1];
+            if (!portBindings.TryGetValue(containerPortProto,
+                    out IList<PortBinding>? list))
+            {
+                list = new List<PortBinding>();
+                portBindings[containerPortProto] = list;
+            }
+            list.Add(new PortBinding { HostPort = hostPort });
+        }
 
         var createParams = new CreateContainerParameters
         {
