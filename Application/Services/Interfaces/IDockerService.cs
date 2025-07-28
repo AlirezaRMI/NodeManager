@@ -17,8 +17,14 @@ public interface IDockerService
     /// <param name="command">Optional command to run in the container.</param>
     /// <param name="networkMode">The network mode for the container (e.g., "bridge", "host").</param>
     /// <returns>The ID of the newly created container.</returns>
-    Task<string> CreateContainerAsync(string imageName, string containerName, List<string> portMappings,
-        Dictionary<string, string> environmentVariables, List<string> volumeMappings, string? command = null, string networkMode = "bridge");
+    Task<string> CreateContainerAsync(
+        string imageName,
+        string containerName,
+        List<string> portMappings,
+        Dictionary<string,string> environmentVariables,
+        List<string> volumeMappings,
+        string? command = null,
+        string  networkMode = "bridge");
 
     /// <summary>
     /// Starts a previously created container.

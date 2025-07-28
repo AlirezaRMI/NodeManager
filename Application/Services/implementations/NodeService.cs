@@ -4,136 +4,79 @@ using Microsoft.Extensions.Logging;
 
 namespace Application.Services.implementations;
 
-public class NodeService(IDockerService dockerManager, ILogger<INodeService> logger) : INodeService
+public class NodeService(IDockerService docker, ILogger<INodeService> logger) : INodeService
 {
-    public async Task<ProvisionResponseDto> ProvisionContainerAsync(ProvisionRequestDto request)
+    public async Task<ProvisionResponseDto> ProvisionContainerAsync(ProvisionRequestDto r)
     {
-        logger.LogInformation("Starting provisioning process for instance ID: {InstanceId}", request.InstanceId);
-        if (request.InboundPort <= 0 || request.XrayPort <= 0 || request.ApiPort <= 0)
+        logger.LogInformation("Provision request for Instance {Id}", r.InstanceId);
+        if (r.InboundPort <= 0 || r.XrayPort <= 0 || r.ApiPort <= 0)
             throw new ArgumentException("All requested ports must be > 0");
 
-        string containerName = $"easyhub-xray-{request.InstanceId}";
-        int assignedInboundPort = request.InboundPort;
-        int assignedXrayPort = request.XrayPort;
-        int assignedServerPort = request.ApiPort;
-        string containerDockerId;
-        string xrayUserUuid = "UUID_NOT_EXTRACTED";
+        var baseDir = $"/var/lib/easyhub-instance-data/{r.InstanceId}";
+        var sslDir  = Path.Combine(baseDir, "ssl");
+        var cert    = Path.Combine(sslDir, "ssl_client_cert.pem");
+        var key     = Path.Combine(sslDir, "ssl_client_key.pem");
 
-        string instanceSpecificDataDirOnHost = $"/var/lib/easyhub-instance-data/{request.InstanceId}";
-        string instanceSslDataPathOnHost = Path.Combine(instanceSpecificDataDirOnHost, "ssl");
+        await docker.CreateDirectoryOnHostAsync(sslDir);
+        await docker.WriteFileOnHostAsync(cert, r.SshPrivateKey!);
+        await docker.WriteFileOnHostAsync(key,  r.SshPrivateKey!);
 
+        await docker.OpenFirewallPortAsync(r.InboundPort);
+        await docker.OpenFirewallPortAsync(r.XrayPort);
+        await docker.OpenFirewallPortAsync(r.ApiPort);
 
-        string clientCertFilePathOnHost = Path.Combine(instanceSslDataPathOnHost, "ssl_client_cert.pem");
-        string clientKeyFilePathOnHost = Path.Combine(instanceSslDataPathOnHost, "ssl_client_key.pem");
-
-        await dockerManager.CreateDirectoryOnHostAsync(instanceSslDataPathOnHost);
-        logger.LogInformation("Directory created on host: {Path}", instanceSslDataPathOnHost);
-
-        if (!string.IsNullOrEmpty(request.SshPrivateKey))
+        var envVars = new Dictionary<string,string>
         {
-            await dockerManager.WriteFileOnHostAsync(clientCertFilePathOnHost, request.SshPrivateKey);
-            logger.LogInformation("Client cert written to host: {Path}", clientCertFilePathOnHost);
-        }
-        else
-        {
-            logger.LogWarning("SslCertificateContent is null or empty. Client cert file will not be written.");
-        }
-
-        if (!string.IsNullOrEmpty(request.SshPrivateKey))
-        {
-            await dockerManager.WriteFileOnHostAsync(clientKeyFilePathOnHost, request.SshPrivateKey);
-            logger.LogInformation("Client key written to host: {Path}", clientKeyFilePathOnHost);
-        }
-        else
-        {
-            logger.LogWarning("SslKeyContent is null or empty. Client key file will not be written.");
-        }
-
-
-        await dockerManager.OpenFirewallPortAsync(assignedInboundPort);
-        await dockerManager.OpenFirewallPortAsync(assignedXrayPort);
-        await dockerManager.OpenFirewallPortAsync(assignedServerPort);
-        logger.LogInformation("Firewall ports opened: {Inbound}, {Xray}, {Server}", assignedInboundPort,
-            assignedXrayPort, assignedServerPort);
-
-        var envVars = new Dictionary<string, string>
-        {
-            { "SERVICE_PORT", assignedInboundPort.ToString() },
-            { "XRAY_API_PORT", assignedXrayPort.ToString() },
-            { "SERVICE_PROTOCOL", "rest" },
-            { "SSL_CLIENT_CERT_FILE", "/var/lib/marzban-node/ssl_client_cert.pem" },
+            ["SERVICE_PORT"]        = r.ApiPort.ToString(), 
+            ["XRAY_API_PORT"]       = r.XrayPort.ToString(),   
+            ["SERVICE_PROTOCOL"]    = "rest",
+            ["SSL_CLIENT_CERT_FILE"] = "/var/lib/marzban-node/ssl/ssl_client_cert.pem",
+            ["SSL_CLIENT_KEY_FILE"]  = "/var/lib/marzban-node/ssl/ssl_client_key.pem"
         };
 
         var volumes = new List<string>
         {
-            $"{instanceSslDataPathOnHost}:/var/lib/marzban-node/ssl:ro"
+            $"{sslDir}:/var/lib/marzban-node/ssl:ro"
+        };
+        var ports   = new List<string>
+        {
+            $"{r.InboundPort}:443/tcp",
+            $"{r.XrayPort}:8080/tcp",
+            $"{r.ApiPort}:8484/tcp"
         };
 
+        var containerId = await docker.CreateContainerAsync(
+            imageName      : r.XrayContainerImage,
+            containerName  : $"easyhub-xray-{r.InstanceId}",
+            portMappings   : ports,
+            environmentVariables : envVars,
+            volumeMappings : volumes);
 
-        containerDockerId = await dockerManager.CreateContainerAsync(
-            imageName: request.XrayContainerImage,
-            containerName: containerName,
-            portMappings: new List<string>
-            {
-                $"{assignedInboundPort}:443/tcp",
-                $"{assignedXrayPort}:8080/tcp",
-                $"{assignedServerPort}:8484/tcp"
-            },
-            environmentVariables: envVars,
-            volumeMappings: volumes
-        );
-        await dockerManager.StartContainerAsync(containerDockerId);
-        logger.LogInformation("Container '{Name}' created and started with ID: {Id}", containerName, containerDockerId);
-
+        await docker.StartContainerAsync(containerId);
+        logger.LogInformation("Container started ({Id})", containerId);
 
         return new ProvisionResponseDto
         {
-            ProvisionedInstanceId = request.InstanceId,
-            IsSuccess = true,
-            ContainerDockerId = containerDockerId,
-            XrayUserUuid = xrayUserUuid,
+            ProvisionedInstanceId = r.InstanceId,
+            IsSuccess            = true,
+            ContainerDockerId    = containerId,
+            XrayUserUuid         = "UUID_NOT_EXTRACTED"
         };
     }
 
-
-    public async Task<string> DeprovisionContainerAsync(string containerId)
+    public async Task<string> DeprovisionContainerAsync(string id)
     {
-        logger.LogInformation("Deprovisioning container {ContainerId}...", containerId);
-        await dockerManager.StopContainerAsync(containerId);
-        await dockerManager.DeleteContainerAsync(containerId);
-        logger.LogInformation("Container {ContainerId} deprovisioned.", containerId);
-        return $"Container {containerId} deprovisioned.";
+        await docker.StopContainerAsync(id);
+        await docker.DeleteContainerAsync(id);
+        return $"Container {id} removed";
     }
 
-    public Task<string> GetContainerStatusAsync(string containerId) =>
-        dockerManager.GetContainerStatusAsync(containerId);
+    public Task<string> GetContainerStatusAsync(string id) => docker.GetContainerStatusAsync(id);
+    public Task<string> GetContainerLogsAsync(string id)   => docker.GetContainerLogsAsync(id);
+    public Task<string> PauseContainerAsync(string id)     {  docker.PauseContainerAsync(id);   return Task.FromResult($"{id} paused"); }
 
-    public Task<string> GetContainerLogsAsync(string containerId) => dockerManager.GetContainerLogsAsync(containerId);
-
-    private async Task CloseAllocatedPortsAndFirewallAsync(params int[] portsToClose)
+    public Task<string> ResumeContainerAsync(string id)
     {
-        foreach (var port in portsToClose)
-        {
-            try
-            {
-                await dockerManager.CloseFirewallPortAsync(port);
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Failed to close port {Port} in firewall.", port);
-            }
-        }
-    }
-
-    public async Task<string> PauseContainerAsync(string containerId)
-    {
-        await dockerManager.PauseContainerAsync(containerId);
-        return $"Container {containerId} paused.";
-    }
-
-    public async Task<string> ResumeContainerAsync(string containerId)
-    {
-        await dockerManager.UnpauseContainerAsync(containerId);
-        return $"Container {containerId} resumed.";
+        docker.UnpauseContainerAsync(id); return Task.FromResult($"{id} resumed");
     }
 }

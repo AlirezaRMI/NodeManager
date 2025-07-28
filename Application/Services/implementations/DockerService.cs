@@ -1,224 +1,218 @@
-﻿using System.Diagnostics;
-using System.Runtime.InteropServices; 
+﻿using System.Buffers;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Text;
-using Application.Services.Interfaces; 
+using Application.Services.Interfaces;
 using Docker.DotNet;
 using Docker.DotNet.Models;
 using Microsoft.Extensions.Logging;
 
 namespace Application.Services.implementations;
 
-public class DockerService(IDockerClient dockerClient, ILogger<IDockerService> logger) : IDockerService
+public sealed class DockerService : IDockerService
 {
-    public async Task<string> CreateContainerAsync(string imageName, string containerName, List<string> portMappings,
-        Dictionary<string, string> environmentVariables, List<string> volumeMappings, string? command = null, string networkMode = "bridge")
-    {
-        var portBindings = new Dictionary<string, IList<PortBinding>>();
+    private readonly IDockerClient _docker;
+    private readonly ILogger<DockerService> _log;
 
-        foreach (var mapping in portMappings)
+    public DockerService(IDockerClient dockerClient, ILogger<DockerService> logger)
+    {
+        _docker = dockerClient;
+        _log    = logger;
+    }
+
+    
+
+    public async Task<string> CreateContainerAsync(
+        string                    imageName,
+        string                    containerName,
+        List<string>              portMappings,
+        Dictionary<string,string> environmentVariables,
+        List<string>              volumeMappings,
+        string?                   command     = null,
+        string                    networkMode = "bridge")
+    {
+        await EnsureImageAsync(imageName);
+        await RemoveExistingContainerIfAny(containerName);
+
+        
+        var portBindings = new Dictionary<string, IList<PortBinding>>();
+        var exposedPorts = new Dictionary<string, EmptyStruct>();
+
+        foreach (var map in portMappings)
         {
-            var split = mapping.Split(':');
-            var hostPort = split[0];
-            var containerPortProto = split[1];
-            if (!portBindings.TryGetValue(containerPortProto,
-                    out IList<PortBinding>? list))
-            {
-                list = new List<PortBinding>();
-                portBindings[containerPortProto] = list;
-            }
-            list.Add(new PortBinding { HostPort = hostPort });
+            var parts         = map.Split(':');
+            var hostPort      = parts[0];
+            var contPortProto = parts[1];
+
+            if (!portBindings.TryGetValue(contPortProto, out var lst))
+                portBindings[contPortProto] = lst = new List<PortBinding>();
+
+            lst.Add(new PortBinding { HostPort = hostPort });
+            exposedPorts[contPortProto] = default;          
         }
 
-        var createParams = new CreateContainerParameters
+        var create = new CreateContainerParameters
         {
-            Image = imageName,
-            Name = containerName,
-            Tty = false,
-            Env = environmentVariables.Select(kv => $"{kv.Key}={kv.Value}").ToList(),
-            HostConfig = new HostConfig
+            Image        = imageName,
+            Name         = containerName,
+            Tty          = false,
+            Env          = environmentVariables.Select(kv => $"{kv.Key}={kv.Value}").ToList(),
+            Cmd          = command?.Split(' '),
+            ExposedPorts = exposedPorts,
+            HostConfig   = new HostConfig
             {
+                NetworkMode  = networkMode,
                 PortBindings = portBindings,
-                NetworkMode = networkMode,
-                Mounts = volumeMappings.Select(v => new Mount
+                Mounts       = volumeMappings.Select(v =>
                 {
-                    Type = "bind",
-                    Source = v.Split(':')[0],
-                    Target = v.Split(':')[1]
+                    var s = v.Split(':');  
+                    return new Mount
+                    {
+                        Type     = "bind",
+                        Source   = s[0],
+                        Target   = s[1],
+                        ReadOnly = s.Length > 2 && s[2].Contains("ro")
+                    };
                 }).ToList()
             }
         };
-        if (command != null) createParams.Cmd = command.Split(' ');
-        
-        logger.LogInformation("Attempting to create container '{ContainerName}' with image '{ImageName}'. Network: {NetworkMode}, Ports: {Ports}, Volumes: {Volumes}, Env: {EnvCount}",
-            containerName, imageName, networkMode, string.Join(",", portMappings), string.Join(",", volumeMappings), environmentVariables.Count);
 
-        try
-        {
-            var response = await dockerClient.Containers.CreateContainerAsync(createParams);
-            logger.LogInformation("Container '{ContainerName}' created with ID: {ContainerId}", containerName, response.ID);
-            return response.ID;
-        }
-        catch (DockerApiException dex)
-        {
-            logger.LogError(dex, "Docker API error creating container '{ContainerName}': {StatusCode} - {Message}", 
-                            containerName, dex.StatusCode, dex.Message);
-            throw new InvalidOperationException($"Docker API error: {dex.StatusCode} - {dex.Message}", dex);
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to create container '{ContainerName}'.", containerName);
-            throw;
-        }
+        _log.LogInformation("Creating container {Name} ({Image}) ...", containerName, imageName);
+        var resp = await _docker.Containers.CreateContainerAsync(create);
+        return resp.ID;
     }
 
-    public async Task StartContainerAsync(string containerId) => await dockerClient.Containers.StartContainerAsync(containerId, new ContainerStartParameters());
-    public async Task StopContainerAsync(string containerId) => await dockerClient.Containers.StopContainerAsync(containerId, new ContainerStopParameters());
-    public async Task DeleteContainerAsync(string containerId) => await dockerClient.Containers.RemoveContainerAsync(containerId, new ContainerRemoveParameters { Force = true });
-    public async Task<string> GetContainerStatusAsync(string containerId) => (await dockerClient.Containers.InspectContainerAsync(containerId)).State.Status;
+    public Task StartContainerAsync (string id) => _docker.Containers.StartContainerAsync(id,new());
+    public Task StopContainerAsync  (string id) => _docker.Containers.StopContainerAsync (id,new());
+    public Task DeleteContainerAsync(string id) => _docker.Containers.RemoveContainerAsync(id,new(){Force=true});
 
+    public async Task<string> GetContainerStatusAsync(string id)
+        => (await _docker.Containers.InspectContainerAsync(id)).State?.Status ?? "unknown";
 
-    [Obsolete("Use newer logging methods if possible.")]
-    public async Task<string> GetContainerLogsAsync(string containerId)
-    {
-        var parameters = new ContainerLogsParameters { ShowStdout = true, ShowStderr = true, Timestamps = true };
-        await using var stream = await dockerClient.Containers.GetContainerLogsAsync(containerId, parameters, CancellationToken.None);
-        using var multiplexedStream = new MultiplexedStream(stream,true); 
-        
-        logger.LogDebug("Log stream is multiplexed. Demultiplexing...");
-        var (stdout, stderr) = await DemultiplexStreamAsync(multiplexedStream, CancellationToken.None);
-        return stdout + (string.IsNullOrEmpty(stderr) ? "" : $"\n--- STDERR ---\n{stderr}");
     
+
+    public async Task<string> GetContainerLogsAsync(string id)
+    {
+        var p = new ContainerLogsParameters { ShowStdout = true, ShowStderr = true };
+        await using var stream = await _docker.Containers.GetContainerLogsAsync(id, p, CancellationToken.None);
+        using var mux = new MultiplexedStream(stream, true);
+
+        var (outBuf, errBuf) = await DemuxAsync(mux);
+        return outBuf + (errBuf.Length == 0 ? "" : "\n---stderr---\n" + errBuf);
     }
-    
-    public async Task<string> ExecuteCommandInContainerAsync(string containerId, string[] command)
-    {
-        var execCreate = await dockerClient.Exec.ExecCreateContainerAsync(containerId, new ContainerExecCreateParameters { AttachStdout = true, AttachStderr = true, Cmd = command });
-      
-        using var stream = await dockerClient.Exec.StartAndAttachContainerExecAsync(execCreate.ID, false);
-        var (stdout, stderr) = await DemultiplexStreamAsync(stream, CancellationToken.None);
 
-        if (!string.IsNullOrEmpty(stderr))
-        {
-            logger.LogWarning("Command '{Command}' in container {ContainerId} returned Stderr: {Stderr}", string.Join(" ", command), containerId, stderr);
-        }
+    public async Task<string> ExecuteCommandInContainerAsync(string id, string[] cmd)
+    {
+        var exec = await _docker.Exec.ExecCreateContainerAsync(id,
+                     new() { Cmd = cmd, AttachStdout = true, AttachStderr = true });
+
+        using var stream = await _docker.Exec.StartAndAttachContainerExecAsync(exec.ID, false);
+        var (stdout, _)  = await DemuxAsync(stream);
         return stdout.Trim();
     }
-    
-    public async Task CreateDirectoryOnHostAsync(string path)
-    {
-        var result = await ExecuteShellCommandAsync("sudo", $"mkdir -p {path}");
-        if (result.ExitCode != 0)
-        {
-            logger.LogError("Failed to create directory '{Path}' on host. Stderr: {StdErr}", path, result.StdErr);
-            throw new InvalidOperationException($"Failed to create directory {path} on host: {result.StdErr}");
-        }
-    }
 
-    public async Task OpenFirewallPortAsync(int port, string protocol = "tcp")
-    {
-        var result = await ExecuteShellCommandAsync("sudo", $"ufw allow {port}/{protocol}");
-        if (result.ExitCode != 0 && !result.StdErr.Contains("Rule already exists"))
-        {
-            logger.LogWarning("Failed to open port {Port}/{Protocol} in firewall. Stderr: {StdErr}", port, protocol, result.StdErr);
-            throw new InvalidOperationException($"Failed to open port {port}/{protocol} in firewall: {result.StdErr}");
-        }
-    }
+    public Task PauseContainerAsync  (string id) => _docker.Containers.PauseContainerAsync  (id);
+    public Task UnpauseContainerAsync(string id) => _docker.Containers.UnpauseContainerAsync(id);
 
-    public async Task CloseFirewallPortAsync(int port, string protocol = "tcp")
-    {
-        var result = await ExecuteShellCommandAsync("sudo", $"ufw delete allow {port}/{protocol}");
-        if (result.ExitCode != 0 && !result.StdErr.Contains("No matching rule"))
-        {
-            logger.LogWarning("Failed to close port {Port}/{Protocol} in firewall. Stderr: {StdErr}", port, protocol, result.StdErr);
-            throw new InvalidOperationException($"Failed to close port {port}/{protocol} in firewall: {result.StdErr}");
-        }
-    }
+    public Task CreateDirectoryOnHostAsync(string path)
+        => Shell("mkdir", $"-p {path}");
 
     public async Task WriteFileOnHostAsync(string filePath, string content)
     {
-        var tempFilePath = Path.GetTempFileName();
-        await File.WriteAllTextAsync(tempFilePath, content); 
-        try
+        var tmp = Path.GetTempFileName();
+        await File.WriteAllTextAsync(tmp, content);
+        try     { await Shell("bash", $"-c \"cat '{tmp}' > '{filePath}'\""); }
+        finally { File.Delete(tmp); }
+    }
+
+    public Task OpenFirewallPortAsync (int p,string proto="tcp")
+        => Shell("ufw",$"allow {p}/{proto}", ignoreExists:true);
+
+    public Task CloseFirewallPortAsync(int p,string proto="tcp")
+        => Shell("ufw",$"delete allow {p}/{proto}", ignoreExists:true);
+    
+
+    private async Task EnsureImageAsync(string image)
+    {
+        var images = await _docker.Images.ListImagesAsync(new ImagesListParameters
         {
-            var result = await ExecuteShellCommandAsync("sudo", $"bash -c \"cat {tempFilePath} > {filePath}\"");
-            if (result.ExitCode != 0)
+            Filters = new Dictionary<string, IDictionary<string, bool>>
             {
-                logger.LogError("Failed to write file '{FilePath}' on host. Stderr: {StdErr}", filePath, result.StdErr);
-                throw new InvalidOperationException($"Failed to write file {filePath} on host: {result.StdErr}");
+                ["reference"] = new Dictionary<string, bool> { [image] = default }
             }
-        }
-        finally
+        });
+        
+
+        if (images.Count == 0)
         {
-            File.Delete(tempFilePath); 
+            _log.LogInformation("Pulling Docker image {Image} ...", image);
+            await _docker.Images.CreateImageAsync(
+                new ImagesCreateParameters { FromImage = image, Tag = "latest" },
+                null,
+                new Progress<JSONMessage>());
+        }
+    }
+
+    private async Task RemoveExistingContainerIfAny(string name)
+    {
+        var containers = await _docker.Containers.ListContainersAsync(new()
+        {
+            All     = true,
+            Filters = new Dictionary<string, IDictionary<string, bool>>
+            {
+                ["name"] = new Dictionary<string, bool> { [name] = default }
+            }
+        });
+
+        foreach (var c in containers)
+        {
+            _log.LogWarning("Removing existing container {Name} ({Id})", name, c.ID);
+            await _docker.Containers.RemoveContainerAsync(c.ID, new() { Force = true });
         }
     }
     
-    private async Task<(int ExitCode, string StdOut, string StdErr)> ExecuteShellCommandAsync(
-        string command,
-        string arguments)
+    private static async Task<(string stdout,string stderr)> DemuxAsync(MultiplexedStream stream)
     {
-        bool isWindows = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
-        string shell = isWindows ? "cmd.exe" : "/bin/bash";
-        string shellArgs = isWindows ? $"/c {command} {arguments}" : $"-c \"{command} {arguments}\"";
-        
-        var startInfo = new ProcessStartInfo
-        {
-            FileName = shell,
-            Arguments = shellArgs,
-            WorkingDirectory = isWindows ? Path.GetTempPath() : "/", 
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
-        
-        using var process = new Process();
-        process.StartInfo = startInfo;
-        
-        logger.LogDebug("Running host command: '{Shell} {ShellArgs}' in '{WorkingDirectory}'", shell, shellArgs, startInfo.WorkingDirectory);
-        
-        process.Start();
+        var outSb = new StringBuilder();
+        var errSb = new StringBuilder();
+        var buf   = ArrayPool<byte>.Shared.Rent(81920);
 
-        string stdout = await process.StandardOutput.ReadToEndAsync();
-        string stderr = await process.StandardError.ReadToEndAsync();
-
-        await process.WaitForExitAsync();
-
-        if (process.ExitCode != 0)
-        {
-            logger.LogWarning("Host command '{Cmd} {Args}' failed with code {Code}. Stderr: {Err}. StdOut: {StdOut}", 
-                              command, arguments, process.ExitCode, stderr, stdout);
-        }
-        return (process.ExitCode, stdout, stderr);
-    }
-    
- 
-    private static async Task<(string stdout, string stderr)> DemultiplexStreamAsync(MultiplexedStream stream, CancellationToken token)
-    {
-        var stdoutBuffer = new MemoryStream();
-        var stderrBuffer = new MemoryStream();
-        byte[] buffer = System.Buffers.ArrayPool<byte>.Shared.Rent(81920); 
         try
         {
             while (true)
             {
-                var result = await stream.ReadOutputAsync(buffer, 0, buffer.Length, token);
-                if (result.EOF) break;
-                if (result.Target == MultiplexedStream.TargetStream.StandardOut) await stdoutBuffer.WriteAsync(buffer, 0, result.Count, token);
-                else if (result.Target == MultiplexedStream.TargetStream.StandardError) await stderrBuffer.WriteAsync(buffer, 0, result.Count, token);
+                var res = await stream.ReadOutputAsync(buf, 0, buf.Length, CancellationToken.None);
+                if (res.EOF) break;
+
+                var text = Encoding.UTF8.GetString(buf, 0, res.Count);
+                if (res.Target == MultiplexedStream.TargetStream.StandardOut)
+                    outSb.Append(text);
+                else
+                    errSb.Append(text);
             }
         }
-        finally { System.Buffers.ArrayPool<byte>.Shared.Return(buffer); }
-        return (Encoding.UTF8.GetString(stdoutBuffer.ToArray()), Encoding.UTF8.GetString(stderrBuffer.ToArray()));
-    }
-    
-    public async Task PauseContainerAsync(string containerId)
-    {
-        await dockerClient.Containers.PauseContainerAsync(containerId, CancellationToken.None);
+        finally { ArrayPool<byte>.Shared.Return(buf); }
+
+        return (outSb.ToString(), errSb.ToString());
     }
 
-    public async Task UnpauseContainerAsync(string containerId)
+    private async Task Shell(string cmd, string args, bool ignoreExists=false)
     {
-        await dockerClient.Containers.UnpauseContainerAsync(containerId, CancellationToken.None);
+        var psi = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+            ? new ProcessStartInfo("cmd.exe", $"/c {cmd} {args}")
+            : new ProcessStartInfo("sudo",      $"{cmd} {args}");
+
+        psi.RedirectStandardError  = true;
+        psi.RedirectStandardOutput = true;
+        psi.CreateNoWindow         = true;
+        psi.UseShellExecute        = false;
+
+        using var p = Process.Start(psi)!;
+        var err = await p.StandardError.ReadToEndAsync();
+        await p.StandardOutput.ReadToEndAsync();
+        await p.WaitForExitAsync();
+
+        if (p.ExitCode != 0 && !(ignoreExists && err.Contains("already exists")))
+            throw new InvalidOperationException($"Host command '{cmd} {args}' failed → {err}");
     }
 }
