@@ -37,7 +37,7 @@ fi
 cd "$INSTALL_DIR"
 if [ -f "compose.yml" ]; then
     echo "compose.yml found. Bringing up services with Docker Compose..."
-    sudo docker compose up -d
+    sudo docker compose up -d --build
 else
     echo "No compose.yml. Building Docker image..."
     sudo docker build -t nodemanager:latest .
