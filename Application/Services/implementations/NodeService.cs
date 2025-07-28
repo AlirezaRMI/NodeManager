@@ -41,8 +41,8 @@ public class NodeService(IDockerService docker, ILogger<INodeService> logger) : 
         var ports   = new List<string>
         {
             $"{r.InboundPort}:443/tcp",
-            $"{r.XrayPort}:8080/tcp",
-            $"{r.ApiPort}:8484/tcp"
+            $"{r.XrayPort}:8080/tcp",      
+            $"{r.ApiPort}:26007/tcp"  
         };
 
         var containerId = await docker.CreateContainerAsync(
