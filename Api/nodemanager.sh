@@ -48,7 +48,7 @@ else
         sudo docker rm nodemanager || true
     fi
     echo "Running NodeManager container..."
-    sudo docker run -d --name nodemanager --restart=always -p 5000:5000 -p 5001:5001 nodemanager:latest
+    sudo docker run -d --name nodemanager --restart=always -p 5050:5050 -p 5252:5252 nodemanager:latest
 fi
 
 SERVICE_FILE="/etc/systemd/system/nodemanager.service"

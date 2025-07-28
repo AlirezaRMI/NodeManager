@@ -34,7 +34,7 @@ public class ProvisionValidator : AbstractValidator<ProvisionRequestDto>
             .InclusiveBetween(1024, 65535)
             .WithMessage("Suggested Xray Port must be between 1024 and 65535.");
         
-        RuleFor(x => x.ServerPort)
+        RuleFor(x => x.ApiPort)
             .InclusiveBetween(1024, 65535)
             .WithMessage("Suggested Server Port must be between 1024 and 65535.");
         

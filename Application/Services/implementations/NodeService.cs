@@ -14,7 +14,7 @@ public class NodeService(IDockerService dockerManager, ILogger<INodeService> log
         string containerName = $"easyhub-xray-{request.InstanceId}";
         int assignedInboundPort = request.InboundPort; 
         int assignedXrayPort = request.XrayPort;      
-        int assignedServerPort = request.ServerPort;  
+        int assignedServerPort = request.ApiPort;  
         string containerDockerId;
         string xrayUserUuid = "UUID_NOT_EXTRACTED";
         
@@ -83,17 +83,12 @@ public class NodeService(IDockerService dockerManager, ILogger<INodeService> log
             await dockerManager.StartContainerAsync(containerDockerId);
             logger.LogInformation("Container '{Name}' created and started with ID: {Id}", containerName, containerDockerId);
       
- 
-
-    
+            
         return new ProvisionResponseDto
         {
             ProvisionedInstanceId = request.InstanceId,
             IsSuccess = true,
             ContainerDockerId = containerDockerId,
-            AssignedInboundPort = assignedInboundPort,
-            AssignedXrayPort = assignedXrayPort,
-            AssignedServerPort = assignedServerPort,
             XrayUserUuid = xrayUserUuid,
         };
     }

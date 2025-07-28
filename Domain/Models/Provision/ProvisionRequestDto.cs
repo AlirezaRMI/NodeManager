@@ -14,6 +14,6 @@ public class ProvisionRequestDto
 
     public int XrayPort { get; set; }
 
-    public int ServerPort { get; set; }
+    public int ApiPort { get; set; }
     
 }
