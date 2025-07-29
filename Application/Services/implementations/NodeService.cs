@@ -13,13 +13,12 @@ public class NodeService(IDockerService docker, ILogger<INodeService> logger) : 
             throw new ArgumentException("All requested ports must be > 0");
 
         var baseDir = $"/var/lib/easyhub-instance-data/{r.InstanceId}";
+        
         var sslDir  = Path.Combine(baseDir, "ssl");
-        var cert    = Path.Combine(sslDir, "ssl_client_cert.pem");
-        var key     = Path.Combine(sslDir, "ssl_client_key.pem");
+        var pemOnHost    = Path.Combine(sslDir, "node.pem");
 
         await docker.CreateDirectoryOnHostAsync(sslDir);
-        await docker.WriteFileOnHostAsync(cert, r.SshPrivateKey!);
-        await docker.WriteFileOnHostAsync(key,  r.SshPrivateKey!);
+        await docker.WriteFileOnHostAsync(pemOnHost, r.SshPrivateKey!);
 
         await docker.OpenFirewallPortAsync(r.InboundPort);
         await docker.OpenFirewallPortAsync(r.XrayPort);
@@ -30,8 +29,7 @@ public class NodeService(IDockerService docker, ILogger<INodeService> logger) : 
             ["SERVICE_PORT"]        = r.ApiPort.ToString(), 
             ["XRAY_API_PORT"]       = r.XrayPort.ToString(),   
             ["SERVICE_PROTOCOL"]    = "rest",
-            ["SSL_CLIENT_CERT_FILE"] = "/var/lib/marzban-node/ssl/ssl_client_cert.pem",
-            ["SSL_CLIENT_KEY_FILE"]  = "/var/lib/marzban-node/ssl/ssl_client_key.pem"
+            ["SSL_CLIENT_CERT_FILE"] = "/var/lib/marzban-node/ssl/node.pem",
         };
 
         var volumes = new List<string>
