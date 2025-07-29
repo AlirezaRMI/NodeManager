@@ -28,8 +28,7 @@ public sealed class DockerService : IDockerService
         List<string>              portMappings,
         Dictionary<string,string> environmentVariables,
         List<string>              volumeMappings,
-        string?                   command     = null,
-        string                    networkMode = "bridge")
+        string?                   command     = null)
     {
         await EnsureImageAsync(imageName);
         await RemoveExistingContainerIfAny(containerName);
@@ -60,7 +59,6 @@ public sealed class DockerService : IDockerService
             ExposedPorts = exposedPorts,
             HostConfig   = new HostConfig
             {
-                NetworkMode  = networkMode,
                 PortBindings = portBindings,
                 Mounts       = volumeMappings.Select(v =>
                 {
