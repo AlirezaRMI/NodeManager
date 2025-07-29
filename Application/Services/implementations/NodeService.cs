@@ -12,13 +12,14 @@ public class NodeService(IDockerService docker, ILogger<INodeService> logger) : 
         if (r.InboundPort <= 0 || r.XrayPort <= 0 || r.ApiPort <= 0)
             throw new ArgumentException("All requested ports must be > 0");
 
-        var baseDir = $"/var/lib/easyhub-instance-data/{r.InstanceId}";
-        
-        var sslDir  = Path.Combine(baseDir, "ssl");
-        var pemOnHost    = Path.Combine(sslDir, "node.pem");
+        var sslDir  = $"/var/lib/easyhub-instance-data/{r.InstanceId}/ssl";
+        var pemPath = Path.Combine(sslDir, "node.pem");
 
         await docker.CreateDirectoryOnHostAsync(sslDir);
-        await docker.WriteFileOnHostAsync(pemOnHost, r.SshPrivateKey!);
+        await docker.WriteFileOnHostAsync(pemPath, r.SshPrivateKey!);;
+
+        await docker.CreateDirectoryOnHostAsync(sslDir);
+        await docker.WriteFileOnHostAsync(pemPath, r.SshPrivateKey!);
 
         await docker.OpenFirewallPortAsync(r.InboundPort);
         await docker.OpenFirewallPortAsync(r.XrayPort);
