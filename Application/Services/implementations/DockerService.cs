@@ -33,7 +33,6 @@ public sealed class DockerService : IDockerService
     {
         await EnsureImageAsync(imageName);
         await RemoveExistingContainerIfAny(containerName);
-
         
         var portBindings = new Dictionary<string, IList<PortBinding>>();
         var exposedPorts = new Dictionary<string, EmptyStruct>();

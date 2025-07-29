@@ -9,6 +9,7 @@ public class NodeService(IDockerService docker, ILogger<INodeService> logger) : 
     public async Task<ProvisionResponseDto> ProvisionContainerAsync(ProvisionRequestDto r)
     {
         logger.LogInformation("Provision request for Instance {Id}", r.InstanceId);
+        
         if (r.InboundPort <= 0 || r.XrayPort <= 0 || r.ApiPort <= 0)
             throw new ArgumentException("All requested ports must be > 0");
 
@@ -17,10 +18,7 @@ public class NodeService(IDockerService docker, ILogger<INodeService> logger) : 
 
         await docker.CreateDirectoryOnHostAsync(sslDir);
         await docker.WriteFileOnHostAsync(pemPath, r.SshPrivateKey!);;
-
-        await docker.CreateDirectoryOnHostAsync(sslDir);
-        await docker.WriteFileOnHostAsync(pemPath, r.SshPrivateKey!);
-
+        
         await docker.OpenFirewallPortAsync(r.InboundPort);
         await docker.OpenFirewallPortAsync(r.XrayPort);
         await docker.OpenFirewallPortAsync(r.ApiPort);
@@ -37,11 +35,12 @@ public class NodeService(IDockerService docker, ILogger<INodeService> logger) : 
         {
             $"{sslDir}:/var/lib/marzban-node/ssl:ro"
         };
-        var ports   = new List<string>
+        
+        var ports = new List<string>
         {
-            $"{r.InboundPort}:443/tcp",
-            $"{r.XrayPort}:8080/tcp",      
-            $"{r.ApiPort}:26007/tcp"  
+            $"{r.InboundPort}:{r.InboundPort}",
+            $"{r.XrayPort}:{r.XrayPort}",
+            $"{r.ApiPort}:{r.ApiPort}"  
         };
 
         var containerId = await docker.CreateContainerAsync(
