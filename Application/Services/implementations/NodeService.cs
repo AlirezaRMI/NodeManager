@@ -25,8 +25,6 @@ public class NodeService(IDockerService docker, ILogger<INodeService> logger) : 
 
         var envVars = new Dictionary<string,string>
         {
-            ["SERVICE_PORT"]        = r.ApiPort.ToString(), 
-            ["XRAY_API_PORT"]       = r.XrayPort.ToString(),   
             ["SERVICE_PROTOCOL"]    = "rest",
             ["SSL_CLIENT_CERT_FILE"] = "/var/lib/marzban-node/ssl/node.pem",
         };
