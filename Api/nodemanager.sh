@@ -23,6 +23,10 @@ if ! command -v git &> /dev/null; then
     sudo apt-get install -y git
 fi
 
+SNIFFER_IMAGE="alirezarmi/sniffer:latest"
+echo "Pulling the latest sniffer-sidecar image from Docker Hub..."
+sudo docker pull "$SNIFFER_IMAGE"
+
 REPO_URL="https://github.com/AlirezaRMI/NodeManager.git"
 INSTALL_DIR="/opt/nodemanager"
 if [ ! -d "$INSTALL_DIR" ]; then
