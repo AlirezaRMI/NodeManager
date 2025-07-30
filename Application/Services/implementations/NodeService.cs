@@ -17,7 +17,7 @@ public class NodeService(IDockerService docker, ILogger<INodeService> logger) : 
         var pemPath = Path.Combine(sslDir, "node.pem");
 
         await docker.CreateDirectoryOnHostAsync(sslDir);
-        await docker.WriteFileOnHostAsync(pemPath, r.SshPrivateKey!);;
+        await docker.WriteFileOnHostAsync(pemPath, r.CertificateKey!);;
         
         await docker.OpenFirewallPortAsync(r.InboundPort);
         await docker.OpenFirewallPortAsync(r.XrayPort);

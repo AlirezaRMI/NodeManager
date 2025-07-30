@@ -10,7 +10,7 @@ public class ProvisionValidator : AbstractValidator<ProvisionRequestDto>
     public ProvisionValidator()
     {
         
-        RuleFor(x => x.SshPrivateKey)
+        RuleFor(x => x.CertificateKey)
             .NotEmpty()
             .WithMessage("Encrypted SSH Private Key content is required.")
             .MaximumLength(4000)
