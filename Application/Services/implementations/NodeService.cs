@@ -97,7 +97,7 @@ public class NodeService(IDockerService docker, ILogger<INodeService> logger) : 
         logger.LogInformation("Fetching traffic for container: {ContainerName}", mainContainerName);
         try
         {
-            var command = new[] { "curl", "-s", "http://localhost:9191/metrics" };
+            var command = new[] { "curl", "-s", "http://127.0.0.1:9191/metrics" };
             string trafficJson = await docker.ExecuteCommandInContainerAsync(mainContainerName, command);
 
             if (string.IsNullOrWhiteSpace(trafficJson))
