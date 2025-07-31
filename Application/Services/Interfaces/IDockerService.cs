@@ -23,8 +23,8 @@ public interface IDockerService
         List<string> portMappings,
         Dictionary<string, string> environmentVariables,
         List<string> volumeMappings,
-        string? command = null,
-        string? networkMode = null);
+        string? command = null
+        , string? networkMode = null);
 
     /// <summary>
     /// Starts a previously created container.

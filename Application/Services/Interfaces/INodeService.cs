@@ -44,4 +44,10 @@ public interface INodeService
     /// </summary>
     /// <param name="containerId">The Docker container ID or name.</param>
     Task<string> ResumeContainerAsync(string containerId);
+    /// <summary>
+    /// this for get instance traffic
+    /// </summary>
+    /// <param name="instanceId"></param>
+    /// <returns></returns>
+    Task<string> GetInstanceTrafficAsync(long instanceId);
 }

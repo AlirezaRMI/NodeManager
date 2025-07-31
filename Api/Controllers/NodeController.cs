@@ -20,19 +20,19 @@ namespace Api.Controllers
             var response = await service.ProvisionContainerAsync(request);
             return Ok(response);
         }
-        
-        [HttpDelete("container/{containerId}")] 
+
+        [HttpDelete("container/{containerId}")]
         [EndpointName("deprovision Container")]
         [EndpointSummary("stops and deletes an Xray container instance.")]
         [ProducesResponseType(typeof(string), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(string), StatusCodes.Status404NotFound)]
-        public async Task<IActionResult> DeprovisionContainer([FromRoute] string containerId) 
+        public async Task<IActionResult> DeprovisionContainer([FromRoute] string containerId)
         {
             var message = await service.DeprovisionContainerAsync(containerId);
             return Ok(message);
         }
-        
-        [HttpGet("container/{containerId}/status")] 
+
+        [HttpGet("container/{containerId}/status")]
         [EndpointName("get Container Status")]
         [EndpointSummary("retrieves the current status of an Xray container instance.")]
         [ProducesResponseType(typeof(string), StatusCodes.Status200OK)]
@@ -53,7 +53,7 @@ namespace Api.Controllers
             string logs = await service.GetContainerLogsAsync(containerId);
             return Ok(logs);
         }
-        
+
         [HttpPost("container/{containerId}/pause")]
         [EndpointName("pause Container")]
         [EndpointSummary("pauses the specified container.")]
@@ -63,7 +63,7 @@ namespace Api.Controllers
         {
             return Ok(await service.PauseContainerAsync(containerId));
         }
-        
+
         [HttpPost("container/{containerId}/resume")]
         [EndpointName("resume Container")]
         [EndpointSummary("resumes (unpauses) the specified container.")]
@@ -72,6 +72,17 @@ namespace Api.Controllers
         public async Task<IActionResult> ResumeContainer([FromRoute] string containerId)
         {
             return Ok(await service.ResumeContainerAsync(containerId));
+        }
+
+        [HttpGet("{id}/traffic")]
+        [EndpointName("get traffic")]
+        [EndpointSummary("retrieves the traffic of an Xray container instance.")]
+        [ProducesResponseType(typeof(string), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(string), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> GetInstanceTraffic([FromRoute] long id)
+        {
+            var traffic = await service.GetInstanceTrafficAsync(id);
+            return Ok(traffic);
         }
     }
 }
