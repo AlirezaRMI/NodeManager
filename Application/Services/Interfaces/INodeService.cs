@@ -1,4 +1,5 @@
-﻿using Domain.Models.Provision;
+﻿using Domain.Model;
+using Domain.Models.Provision;
 
 namespace Application.Services.Interfaces;
 
@@ -49,5 +50,5 @@ public interface INodeService
     /// </summary>
     /// <param name="instanceId"></param>
     /// <returns></returns>
-    Task<string> GetInstanceTrafficAsync(long instanceId);
+    Task<TrafficUsageDto> GetInstanceTrafficAsync(long instanceId);
 }

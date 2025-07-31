@@ -1,6 +1,8 @@
 ﻿using Application.Services.Interfaces;
+using Domain.Model;
 using Domain.Models.Provision;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
 
 namespace Application.Services.implementations;
 
@@ -91,7 +93,7 @@ public class NodeService(IDockerService docker, ILogger<INodeService> logger) : 
     public Task<string> PauseContainerAsync(string id) {  docker.PauseContainerAsync(id);   return Task.FromResult($"{id} paused"); }
     public Task<string> ResumeContainerAsync(string id) { docker.UnpauseContainerAsync(id); return Task.FromResult($"{id} resumed"); }
 
-    public async Task<string> GetInstanceTrafficAsync(long instanceId)
+    public async Task<TrafficUsageDto> GetInstanceTrafficAsync(long instanceId)
     {
         var mainContainerName = $"easyhub-xray-{instanceId}";
         logger.LogInformation("Fetching traffic for container: {ContainerName}", mainContainerName);
@@ -106,7 +108,8 @@ public class NodeService(IDockerService docker, ILogger<INodeService> logger) : 
                 logger.LogWarning("Received empty response from sniffer for container {ContainerName}", mainContainerName);
                 throw new InvalidOperationException("Received empty response from sniffer sidecar.");
             }
-            return trafficJson;
+            var dto = JsonConvert.DeserializeObject<TrafficUsageDto>(trafficJson); 
+            return dto!;
         }
         catch (Exception ex)
         {
