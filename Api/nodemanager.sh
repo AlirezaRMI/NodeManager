@@ -35,7 +35,7 @@ else
     echo "Updating existing NodeManager repository..."
     sudo git -C "$INSTALL_DIR" pull
 fi
-SNIFFER_IMAGE="alirezarmi/sniffer:latest"
+SNIFFER_IMAGE="ghcr.io/alirezarmi/sniffer:latest"
 echo "Pulling the latest sniffer image from Docker Hub..."
 sudo docker pull "$SNIFFER_IMAGE"
 

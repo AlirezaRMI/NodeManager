@@ -42,7 +42,7 @@ public class NodeService(IDockerService docker, ILogger<INodeService> logger) : 
             $"{r.ApiPort}:62050"  
         };
         var sidecarContainerName = $"easyhub-sniffer-{r.InstanceId}";
-        var sidecarImageName = "alirezarmi/sniffer-sidecar:latest";
+        var sidecarImageName = "ghcr.io/alirezarmi/sniffer:latest";
 
         var containerId = await docker.CreateContainerAsync(
             imageName      : r.XrayContainerImage,
