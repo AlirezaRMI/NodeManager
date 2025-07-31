@@ -24,7 +24,7 @@ if ! command -v git &> /dev/null; then
 fi
 
 SNIFFER_IMAGE="alirezarmi/sniffer:latest"
-echo "Pulling the latest sniffer-sidecar image from Docker Hub..."
+echo "Pulling the latest sniffer image from Docker Hub..."
 sudo docker pull "$SNIFFER_IMAGE"
 
 REPO_URL="https://github.com/AlirezaRMI/NodeManager.git"
