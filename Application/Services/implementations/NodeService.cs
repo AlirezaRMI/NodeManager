@@ -1,4 +1,5 @@
 ﻿using Application.Services.Interfaces;
+using Application.Utils;
 using Domain.Models.Provision;
 using Microsoft.Extensions.Logging;
 
@@ -40,6 +41,8 @@ public class NodeService(IDockerService docker, ILogger<INodeService> logger) : 
             $"{r.XrayPort}:62051",
             $"{r.ApiPort}:62050"  
         };
+        var sidecarContainerName = $"easyhub-sniffer-{r.InstanceId}";
+        var sidecarImageName = "alirezarmi/sniffer-sidecar:latest";
 
         var containerId = await docker.CreateContainerAsync(
             imageName      : r.XrayContainerImage,
@@ -47,16 +50,31 @@ public class NodeService(IDockerService docker, ILogger<INodeService> logger) : 
             portMappings   : ports,
             environmentVariables : envVars,
             volumeMappings : volumes);
-
+        
         await docker.StartContainerAsync(containerId);
         logger.LogInformation("Container started ({Id})", containerId);
+        
+        var snifferApiPort = FindTcpPort.FindFreeTcpPort();
+        var sidecarPorts = new List<string> { $"127.0.0.1:{snifferApiPort}:9191" };
+        var sidecarContainerId = await docker.CreateContainerAsync(
+            imageName: sidecarImageName,
+            containerName: sidecarContainerName,
+            portMappings: sidecarPorts,
+            environmentVariables: new Dictionary<string, string>(),
+            volumeMappings: new List<string>(),
+            networkMode: $"container:{containerId}" 
+        );
+          
+        await docker.StartContainerAsync(sidecarContainerId);
+        logger.LogInformation("Sidecar container started ({Id})", sidecarContainerId);
 
         return new ProvisionResponseDto
         {
             ProvisionedInstanceId = r.InstanceId,
             IsSuccess            = true,
             ContainerDockerId    = containerId,
-            XrayUserUuid         = "UUID_NOT_EXTRACTED"
+            XrayUserUuid         = "UUID_NOT_EXTRACTED",
+            SnifferApiPort = snifferApiPort,
         };
     }
 

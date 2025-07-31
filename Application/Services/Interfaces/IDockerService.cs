@@ -21,9 +21,10 @@ public interface IDockerService
         string imageName,
         string containerName,
         List<string> portMappings,
-        Dictionary<string,string> environmentVariables,
+        Dictionary<string, string> environmentVariables,
         List<string> volumeMappings,
-        string? command = null);
+        string? command = null,
+        string? networkMode = null);
 
     /// <summary>
     /// Starts a previously created container.
@@ -42,7 +43,7 @@ public interface IDockerService
     /// </summary>
     /// <param name="containerId">The ID or name of the container to delete.</param>
     Task DeleteContainerAsync(string containerId);
-    
+
     /// <summary>
     /// Gets the current status of a container (e.g., "running", "exited").
     /// </summary>
@@ -54,7 +55,7 @@ public interface IDockerService
     /// </summary>
     /// <param name="containerId">The ID or name of the container.</param>
     Task<string> GetContainerLogsAsync(string containerId);
-    
+
     /// <summary>
     /// Executes a command inside a running container.
     /// </summary>
@@ -77,12 +78,12 @@ public interface IDockerService
     /// Writes content to a file on the host OS, typically for certificates.
     /// </summary>
     Task WriteFileOnHostAsync(string filePath, string content);
-    
+
     /// <summary>
     /// Creates a directory on the host OS.
     /// </summary>
     Task CreateDirectoryOnHostAsync(string path);
-    
+
     /// <summary>
     /// Pauses all processes within a running container.
     /// </summary>

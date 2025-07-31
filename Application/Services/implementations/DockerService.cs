@@ -28,7 +28,8 @@ public sealed class DockerService : IDockerService
         List<string>              portMappings,
         Dictionary<string,string> environmentVariables,
         List<string>              volumeMappings,
-        string?                   command     = null)
+        string?                   command     = null,
+        string?                   networkMode  = null)
     {
         await EnsureImageAsync(imageName);
         await RemoveExistingContainerIfAny(containerName);
@@ -49,6 +50,27 @@ public sealed class DockerService : IDockerService
             exposedPorts[contPortProto] = default;          
         }
 
+        var hostConfig = new HostConfig
+        {
+            PortBindings = portBindings,
+            Mounts = volumeMappings.Select(v =>
+            {
+                var s = v.Split(':');
+                return new Mount
+                {
+                    Type = "bind",
+                    Source = s[0],
+                    Target = s[1],
+                    ReadOnly = s.Length > 2 && s[2].Contains("ro")
+                };
+            }).ToList()
+        };
+        if (!string.IsNullOrEmpty(networkMode))
+        {
+            hostConfig.NetworkMode = networkMode;
+        }
+        
+
         var create = new CreateContainerParameters
         {
             Image        = imageName,
@@ -57,21 +79,7 @@ public sealed class DockerService : IDockerService
             Env          = environmentVariables.Select(kv => $"{kv.Key}={kv.Value}").ToList(),
             Cmd          = command?.Split(' '),
             ExposedPorts = exposedPorts,
-            HostConfig   = new HostConfig
-            {
-                PortBindings = portBindings,
-                Mounts       = volumeMappings.Select(v =>
-                {
-                    var s = v.Split(':');  
-                    return new Mount
-                    {
-                        Type     = "bind",
-                        Source   = s[0],
-                        Target   = s[1],
-                        ReadOnly = s.Length > 2 && s[2].Contains("ro")
-                    };
-                }).ToList()
-            }
+            HostConfig   = hostConfig,
         };
 
         _log.LogInformation("Creating container {Name} ({Image}) ...", containerName, imageName);
