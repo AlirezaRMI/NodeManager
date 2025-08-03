@@ -1,4 +1,6 @@
-﻿using Application.Services.implementations;
+﻿using Application.Client;
+using Application.Infrastructure;
+using Application.Services.implementations;
 using Application.Services.Interfaces;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -12,6 +14,10 @@ public static class ServiceProvider
     {
         services.AddScoped<IDockerService, DockerService>();
         services.AddScoped(typeof(INodeService), typeof(NodeService));
+        services.AddHttpClient<IEasyHubApiClient, EasyHubApiClient>();
+        services.Configure<EasyhubTemplateModel>(configuration.GetSection("EasyhubTemplateModel"));
+        services.AddHostedService<UsageReportingJob>();
+        services.AddSingleton<ILocalInstanceStore, LocalInstanceStore>();
 
         return services;
     }

@@ -1,12 +1,12 @@
 ﻿using Newtonsoft.Json;
 
-namespace Domain.Model;
+namespace Domain.DTOs.Instance;
 
 public class TrafficUsageDto
 {
-    [JsonProperty("total_bytes_in")]
+    [JsonProperty("in")]
     public long TotalBytesIn { get; set; }
 
-    [JsonProperty("total_bytes_out")]
-    public long TotalBytesOut { get; set; }  
+    [JsonProperty("out")]
+    public long TotalBytesOut { get; set; }
 }

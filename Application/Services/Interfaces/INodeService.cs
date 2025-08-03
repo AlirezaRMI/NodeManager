@@ -1,4 +1,4 @@
-﻿using Domain.Model;
+﻿using Domain.DTOs.Instance;
 using Domain.Models.Provision;
 
 namespace Application.Services.Interfaces;
@@ -13,11 +13,12 @@ public interface INodeService
     Task<ProvisionResponseDto> ProvisionContainerAsync(ProvisionRequestDto request);
 
     /// <summary>
-    /// Requests to deprovision (stop and delete) an existing Xray container instance.
+    /// Requests to deprovision (stop and delete) an existing X-ray container instance.
     /// </summary>
     /// <param name="containerId">The Docker container ID or name of the instance to deprovision.</param>
+    /// <param name="instanceId"></param>
     /// <returns>A success message indicating the deprovisioning status.</returns>
-    Task<string> DeprovisionContainerAsync(string containerId);
+    Task<string> DeprovisionContainerAsync(string containerId,long instanceId);
 
     /// <summary>
     /// Retrieves the current status of a provisioned container.
@@ -33,7 +34,6 @@ public interface INodeService
     /// <returns>The container logs as a string.</returns>
     Task<string> GetContainerLogsAsync(string containerId);
     
-       
     /// <summary>
     /// Pauses a provisioned container.
     /// </summary>
@@ -46,9 +46,16 @@ public interface INodeService
     /// <param name="containerId">The Docker container ID or name.</param>
     Task<string> ResumeContainerAsync(string containerId);
     /// <summary>
-    /// this for get instance traffic
+    /// this for get local instance
+    /// </summary>
+    /// <returns></returns>
+    Task<IEnumerable<InstanceInfo>> GetAllLocalInstancesAsync();
+    
+    /// <summary>
+    /// this for get traffic of ports
     /// </summary>
     /// <param name="instanceId"></param>
     /// <returns></returns>
-    Task<TrafficUsageDto> GetInstanceTrafficAsync(long instanceId);
+    Task<string> GetInstanceTrafficAsync(long instanceId);
+    
 }

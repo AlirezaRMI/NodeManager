@@ -1,14 +1,18 @@
-﻿using Application.Services.Interfaces;
-using Domain.Model;
+﻿using System.Net.Http.Json;
+using Application.Services.Interfaces;
+using Domain.DTOs.Instance;
 using Domain.Models.Provision;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 
+
 namespace Application.Services.implementations;
 
 
-public class NodeService(IDockerService docker, ILogger<INodeService> logger) : INodeService
+public class NodeService(IDockerService docker, ILogger<INodeService> logger,ILocalInstanceStore localInstanceStore) : INodeService
 {
+    
+    private const string LocalInstanceDbPath = "instances.json";
     public async Task<ProvisionResponseDto> ProvisionContainerAsync(ProvisionRequestDto r)
     {
         logger.LogInformation("Provision request for Instance {Id}", r.InstanceId);
@@ -46,8 +50,6 @@ public class NodeService(IDockerService docker, ILogger<INodeService> logger) : 
         };
 
         var mainContainerName = $"easyhub-xray-{r.InstanceId}";
-        var sidecarContainerName = $"easyhub-sniffer-{r.InstanceId}";
-        var sidecarImageName = "ghcr.io/alirezarmi/sniffer:latest";
 
         var containerId = await docker.CreateContainerAsync(
             imageName: r.XrayContainerImage,
@@ -58,19 +60,13 @@ public class NodeService(IDockerService docker, ILogger<INodeService> logger) : 
 
         await docker.StartContainerAsync(containerId);
         logger.LogInformation("Container started ({Id})", containerId);
-
-       
-        var sidecarContainerId = await docker.CreateContainerAsync(
-            imageName: sidecarImageName,
-            containerName: sidecarContainerName,
-            portMappings: new List<string>(),
-            environmentVariables: new Dictionary<string, string>(),
-            volumeMappings: new List<string>(),
-            networkMode: $"container:{mainContainerName}" 
-        );
-
-        await docker.StartContainerAsync(sidecarContainerId);
-        logger.LogInformation("Sidecar container started ({Id})", sidecarContainerId);
+        using var httpClient = new HttpClient();
+        var portsToWatch = new[] { r.InboundPort, r.ApiPort, r.XrayPort };
+        foreach (var port in portsToWatch)
+        {
+            await httpClient.PostAsJsonAsync("http://localhost:9191/watch", new { port });
+        }
+        await localInstanceStore.AddAsync(new InstanceInfo { Id = r.InstanceId });
 
         return new ProvisionResponseDto
         {
@@ -81,10 +77,11 @@ public class NodeService(IDockerService docker, ILogger<INodeService> logger) : 
         };
     }
 
-    public async Task<string> DeprovisionContainerAsync(string id)
+    public async Task<string> DeprovisionContainerAsync(string id,long instanceId)
     {
         await docker.StopContainerAsync(id);
         await docker.DeleteContainerAsync(id);
+        await localInstanceStore.RemoveAsync(instanceId);
         return $"Container {id} removed";
     }
 
@@ -92,29 +89,20 @@ public class NodeService(IDockerService docker, ILogger<INodeService> logger) : 
     public Task<string> GetContainerLogsAsync(string id)   => docker.GetContainerLogsAsync(id);
     public Task<string> PauseContainerAsync(string id) {  docker.PauseContainerAsync(id);   return Task.FromResult($"{id} paused"); }
     public Task<string> ResumeContainerAsync(string id) { docker.UnpauseContainerAsync(id); return Task.FromResult($"{id} resumed"); }
+    public async Task<IEnumerable<InstanceInfo>> GetAllLocalInstancesAsync()
+    {
+        if (!File.Exists(LocalInstanceDbPath))
+        {
+            return [];
+        }
+        var json = await File.ReadAllTextAsync(LocalInstanceDbPath);
+        return JsonConvert.DeserializeObject<List<InstanceInfo>>(json) ?? new List<InstanceInfo>();
+    }
 
-    public async Task<TrafficUsageDto> GetInstanceTrafficAsync(long instanceId)
+    public async Task<string> GetInstanceTrafficAsync(long instanceId)
     {
         var mainContainerName = $"easyhub-xray-{instanceId}";
-        logger.LogInformation("Fetching traffic for container: {ContainerName}", mainContainerName);
-        try
-        {
-            var sidecarContainerName = $"easyhub-sniffer-{instanceId}";
-            var command = new[] { "curl", "-s", "http://127.0.0.1:9191/metrics" };
-            string trafficJson = await docker.ExecuteCommandInContainerAsync(sidecarContainerName, command);
-
-            if (string.IsNullOrWhiteSpace(trafficJson))
-            {
-                logger.LogWarning("Received empty response from sniffer for container {ContainerName}", mainContainerName);
-                throw new InvalidOperationException("Received empty response from sniffer sidecar.");
-            }
-            var dto = JsonConvert.DeserializeObject<TrafficUsageDto>(trafficJson); 
-            return dto!;
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to execute traffic command in container {ContainerName}", mainContainerName);
-            throw;
-        }
+        var command = new[] { "curl", "-s", "http://127.0.0.1:9191/metrics" };
+        return await docker.ExecuteCommandInContainerAsync(mainContainerName, command);
     }
 }

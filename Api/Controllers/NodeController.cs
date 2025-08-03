@@ -1,5 +1,4 @@
-﻿using Api.Filters; // Assuming you have this for ApiResult
-using Application.Services.Interfaces;
+﻿using Application.Services.Interfaces;
 using Domain.Models.Provision;
 using Microsoft.AspNetCore.Mvc;
 
@@ -21,16 +20,16 @@ namespace Api.Controllers
             return Ok(response);
         }
 
-        [HttpDelete("container/{containerId}")]
-        [EndpointName("deprovision Container")]
-        [EndpointSummary("stops and deletes an Xray container instance.")]
-        [ProducesResponseType(typeof(string), StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(string), StatusCodes.Status404NotFound)]
-        public async Task<IActionResult> DeprovisionContainer([FromRoute] string containerId)
-        {
-            var message = await service.DeprovisionContainerAsync(containerId);
-            return Ok(message);
-        }
+        // [HttpDelete("container/{containerId}")]
+        // [EndpointName("deprovision Container")]
+        // [EndpointSummary("stops and deletes a Xray container instance.")]
+        // [ProducesResponseType(typeof(string), StatusCodes.Status200OK)]
+        // [ProducesResponseType(typeof(string), StatusCodes.Status404NotFound)]
+        // public async Task<IActionResult> DeprovisionContainer([FromRoute] string containerId)
+        // {
+        //     var message = await service.DeprovisionContainerAsync(containerId);
+        //     return Ok(message);
+        // }
 
         [HttpGet("container/{containerId}/status")]
         [EndpointName("get Container Status")]
@@ -73,16 +72,6 @@ namespace Api.Controllers
         {
             return Ok(await service.ResumeContainerAsync(containerId));
         }
-
-        [HttpGet("{id}/traffic")]
-        [EndpointName("get traffic")]
-        [EndpointSummary("retrieves the traffic of an Xray container instance.")]
-        [ProducesResponseType(typeof(string), StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(string), StatusCodes.Status404NotFound)]
-        public async Task<IActionResult> GetInstanceTraffic([FromRoute] long id)
-        {
-            var traffic = await service.GetInstanceTrafficAsync(id);
-            return Ok(traffic);
-        }
+        
     }
 }
