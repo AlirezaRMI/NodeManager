@@ -102,7 +102,16 @@ public class NodeService(IDockerService docker, ILogger<INodeService> logger,ILo
     public async Task<string> GetInstanceTrafficAsync(long instanceId)
     {
         var mainContainerName = $"easyhub-xray-{instanceId}";
-        var command = new[] { "curl", "-s", "http://127.0.0.1:9191/metrics" };
-        return await docker.ExecuteCommandInContainerAsync(mainContainerName, command);
+        var rx = await docker.ExecuteCommandInContainerAsync(mainContainerName, ["cat", "/sys/class/net/eth0/statistics/rx_bytes"
+        ]);
+        var tx = await docker.ExecuteCommandInContainerAsync(mainContainerName, ["cat", "/sys/class/net/eth0/statistics/tx_bytes"
+        ]);
+        var traffic = new
+        {
+            TotalBytesIn = long.Parse(rx.Trim()),
+            TotalBytesOut = long.Parse(tx.Trim())
+        };
+        return JsonConvert.SerializeObject(traffic);
     }
+
 }
