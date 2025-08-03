@@ -6,7 +6,7 @@ namespace Application.Services.implementations;
 
 public class LocalInstanceStore : ILocalInstanceStore
 {
-    private const string DbPath = "/var/lib/easyhub-instance-data/instances.json";
+    private const string LocalInstanceDbPath = "/var/lib/easyhub-instance-data/instances.json";
     private static readonly SemaphoreSlim Semaphore = new(1, 1);
 
     public async Task<List<InstanceInfo>> GetAllAsync()
@@ -14,8 +14,8 @@ public class LocalInstanceStore : ILocalInstanceStore
         await Semaphore.WaitAsync();
         try
         {
-            if (!File.Exists(DbPath)) return [];
-            var json = await File.ReadAllTextAsync(DbPath);
+            if (!File.Exists(LocalInstanceDbPath)) return [];
+            var json = await File.ReadAllTextAsync(LocalInstanceDbPath);
             return JsonConvert.DeserializeObject<List<InstanceInfo>>(json) ?? new List<InstanceInfo>();
         }
         finally
@@ -26,27 +26,37 @@ public class LocalInstanceStore : ILocalInstanceStore
 
     public async Task AddAsync(InstanceInfo newInstance)
     {
-        
         await Semaphore.WaitAsync();
         try
         {
-            var directory = Path.GetDirectoryName(DbPath);
+            var directory = Path.GetDirectoryName(LocalInstanceDbPath);
             if (!Directory.Exists(directory))
             {
                 Directory.CreateDirectory(directory!);
             }
-            var instances = await GetAllAsync(); 
+
+            Console.WriteLine($"📁 Instance store directory: {directory}");
+            Console.WriteLine($"📄 Instance DB Path: {LocalInstanceDbPath}");
+
+            var instances = await GetAllAsync();
             if (instances.All(i => i.Id != newInstance.Id))
             {
                 instances.Add(newInstance);
                 var json = JsonConvert.SerializeObject(instances, Formatting.Indented);
-                if (!Directory.Exists(directory) || !new DirectoryInfo(directory!).Attributes.HasFlag(FileAttributes.Directory))
-                {
-                    throw new Exception($"Directory {directory} is not accessible or not a directory");
-                }
 
-                await File.WriteAllTextAsync(DbPath, json);
+                await File.WriteAllTextAsync(LocalInstanceDbPath, json);
+
+                Console.WriteLine($"✅ Successfully wrote to {LocalInstanceDbPath}");
             }
+            else
+            {
+                Console.WriteLine($"ℹ️ Instance with ID {newInstance.Id} already exists.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Failed to write instance JSON: {ex.Message}");
+            throw;
         }
         finally
         {
@@ -54,13 +64,14 @@ public class LocalInstanceStore : ILocalInstanceStore
         }
     }
 
+
     public async Task RemoveAsync(long instanceId)
     {
         
         await Semaphore.WaitAsync();
         try
         {
-            var directory = Path.GetDirectoryName(DbPath);
+            var directory = Path.GetDirectoryName(LocalInstanceDbPath);
             if (!Directory.Exists(directory))
             {
                 Directory.CreateDirectory(directory!);
@@ -76,7 +87,7 @@ public class LocalInstanceStore : ILocalInstanceStore
                     throw new Exception($"Directory {directory} is not accessible or not a directory");
                 }
 
-                await File.WriteAllTextAsync(DbPath, json);
+                await File.WriteAllTextAsync(LocalInstanceDbPath, json);
             }
         }
         finally
