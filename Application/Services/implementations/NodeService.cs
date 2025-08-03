@@ -61,11 +61,7 @@ public class NodeService(IDockerService docker, ILogger<INodeService> logger,ILo
         await docker.StartContainerAsync(containerId);
         logger.LogInformation("Container started ({Id})", containerId);
         using var httpClient = new HttpClient();
-        var portsToWatch = new[] { r.InboundPort, r.ApiPort, r.XrayPort };
-        foreach (var port in portsToWatch)
-        {
-            await httpClient.PostAsJsonAsync("http://localhost:9191/watch", new { port });
-        }
+
         await localInstanceStore.AddAsync(new InstanceInfo { Id = r.InstanceId });
 
         return new ProvisionResponseDto
