@@ -14,7 +14,12 @@ public class LocalInstanceStore : ILocalInstanceStore
         await Semaphore.WaitAsync();
         try
         {
-            if (!File.Exists(LocalInstanceDbPath)) return [];
+            if (!File.Exists(LocalInstanceDbPath))
+            {
+                await File.WriteAllTextAsync(LocalInstanceDbPath, "[]");
+                return new List<InstanceInfo>();
+            }
+
             var json = await File.ReadAllTextAsync(LocalInstanceDbPath);
             return JsonConvert.DeserializeObject<List<InstanceInfo>>(json) ?? new List<InstanceInfo>();
         }
@@ -24,38 +29,42 @@ public class LocalInstanceStore : ILocalInstanceStore
         }
     }
 
+
     public async Task AddAsync(InstanceInfo newInstance)
     {
         await Semaphore.WaitAsync();
         try
         {
             var directory = Path.GetDirectoryName(LocalInstanceDbPath);
+            Console.WriteLine($"📁[AddAsync] Directory: {directory}");
+
             if (!Directory.Exists(directory))
             {
                 Directory.CreateDirectory(directory!);
+                Console.WriteLine($"📂[AddAsync] Directory created.");
             }
 
-            Console.WriteLine($"📁 Instance store directory: {directory}");
-            Console.WriteLine($"📄 Instance DB Path: {LocalInstanceDbPath}");
-
             var instances = await GetAllAsync();
+            Console.WriteLine($"📄[AddAsync] Existing instance count: {instances.Count}");
+
             if (instances.All(i => i.Id != newInstance.Id))
             {
                 instances.Add(newInstance);
-                var json = JsonConvert.SerializeObject(instances, Formatting.Indented);
+                Console.WriteLine($"➕[AddAsync] Adding instance with ID {newInstance.Id}");
 
+                var json = JsonConvert.SerializeObject(instances, Formatting.Indented);
                 await File.WriteAllTextAsync(LocalInstanceDbPath, json);
 
-                Console.WriteLine($"✅ Successfully wrote to {LocalInstanceDbPath}");
+                Console.WriteLine($"✅[AddAsync] Successfully wrote to {LocalInstanceDbPath}");
             }
             else
             {
-                Console.WriteLine($"ℹ️ Instance with ID {newInstance.Id} already exists.");
+                Console.WriteLine($"⚠️[AddAsync] Instance ID {newInstance.Id} already exists.");
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"❌ Failed to write instance JSON: {ex.Message}");
+            Console.WriteLine($"❌[AddAsync] Failed to write instance JSON: {ex.Message}");
             throw;
         }
         finally
@@ -63,6 +72,7 @@ public class LocalInstanceStore : ILocalInstanceStore
             Semaphore.Release();
         }
     }
+
 
 
     public async Task RemoveAsync(long instanceId)
