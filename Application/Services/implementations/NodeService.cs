@@ -59,11 +59,11 @@ public class NodeService(IDockerService docker, ILogger<INodeService> logger,ILo
             volumeMappings: volumes);
 
         await docker.StartContainerAsync(containerId);
-        logger.LogInformation("Container started ({Id})", containerId);
-        using var httpClient = new HttpClient();
-
+        
         await localInstanceStore.AddAsync(new InstanceInfo { Id = r.InstanceId });
-
+        
+        logger.LogInformation("Container started ({Id})", containerId);
+        
         return new ProvisionResponseDto
         {
             ProvisionedInstanceId = r.InstanceId,
