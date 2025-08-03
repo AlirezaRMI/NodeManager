@@ -20,6 +20,9 @@ public class EasyHubApiClient(
 
         var requestUrl = EasyHubUrlPath.UpdateUsage;
         logger.LogInformation("Submitting usage report to EasyHub at {Url}", requestUrl);
+        
+        logger.LogInformation("EasyHub BaseAddress = {BaseAddress}", httpClient.BaseAddress);
+
 
         try
         {
