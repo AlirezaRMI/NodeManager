@@ -1,6 +1,7 @@
 ﻿using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using Domain.DTOs.Instance;
+using Domain.Model;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 

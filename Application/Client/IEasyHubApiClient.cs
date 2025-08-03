@@ -1,4 +1,5 @@
 ﻿using Domain.DTOs.Instance;
+using Domain.Model;
 
 namespace Application.Client;
 

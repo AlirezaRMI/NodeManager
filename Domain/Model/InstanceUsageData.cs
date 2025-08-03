@@ -1,4 +1,4 @@
-﻿namespace Domain.DTOs.Instance;
+﻿namespace Domain.Model;
 
 public class InstanceUsageData
 {

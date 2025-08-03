@@ -1,6 +1,7 @@
 ﻿using Application.Client;
 using Application.Services.Interfaces;
 using Domain.DTOs.Instance;
+using Domain.Model;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -31,7 +32,6 @@ public class UsageReportingJob(IServiceProvider serviceProvider, ILogger<UsageRe
             var localInstanceStore = scope.ServiceProvider.GetRequiredService<ILocalInstanceStore>(); 
 
             var localInstances = await localInstanceStore.GetAllAsync();
-
             if (!localInstances.Any())
             {
                 logger.LogWarning("⚠️ No local instances found. Skipping report submission.");
@@ -46,11 +46,17 @@ public class UsageReportingJob(IServiceProvider serviceProvider, ILogger<UsageRe
                 logger.LogInformation("📍 Processing instance {InstanceId}", instance.Id);
                 try
                 {
+
                     var trafficJson = await nodeService.GetInstanceTrafficAsync(instance.Id);
+                    logger.LogInformation("  [DEBUG] Raw JSON from NodeService: {Json}", trafficJson);
+
                     if (string.IsNullOrWhiteSpace(trafficJson)) continue;
 
                     var currentTraffic = JsonConvert.DeserializeObject<TrafficUsageDto>(trafficJson);
                     if (currentTraffic == null) continue;
+
+                    logger.LogInformation("  [DEBUG] Last saved values -> RX: {LastRx}, TX: {LastTx}", instance.LastTotalRx, instance.LastTotalTx);
+                    logger.LogInformation("  [DEBUG] Current values from container -> RX: {CurrentRx}, TX: {CurrentTx}", currentTraffic.TotalBytesIn, currentTraffic.TotalBytesOut);
 
                     long usageDelta = 0;
                     if (instance.LastTotalRx > 0 || instance.LastTotalTx > 0)
@@ -62,6 +68,8 @@ public class UsageReportingJob(IServiceProvider serviceProvider, ILogger<UsageRe
                         }
                     }
                     
+                    logger.LogInformation("  [DEBUG] Calculated Delta: {Delta} bytes", usageDelta);
+
                     if (usageDelta > 0)
                     {
                         logger.LogInformation("📊 Usage for instance {InstanceId} in this interval: {Bytes} bytes", instance.Id, usageDelta);
@@ -78,7 +86,6 @@ public class UsageReportingJob(IServiceProvider serviceProvider, ILogger<UsageRe
                     
                     instance.LastTotalRx = currentTraffic.TotalBytesIn;
                     instance.LastTotalTx = currentTraffic.TotalBytesOut;
-
                     await localInstanceStore.UpdateAsync(instance);
                 }
                 catch (Exception ex)
