@@ -35,46 +35,43 @@ public class LocalInstanceStore : ILocalInstanceStore
         await Semaphore.WaitAsync();
         try
         {
-            var directory = Path.GetDirectoryName(LocalInstanceDbPath);
-            Console.WriteLine($"📁[AddAsync] Directory: {directory}");
+            Console.WriteLine($"📁[AddAsync] Directory: {Path.GetDirectoryName(LocalInstanceDbPath)}");
+            Console.WriteLine($"📄[AddAsync] Target Path: {LocalInstanceDbPath}");
 
-            if (!Directory.Exists(directory))
-            {
-                Directory.CreateDirectory(directory!);
-                Console.WriteLine($"📂[AddAsync] Directory created.");
-            }
-
-            var instances = await GetAllAsync();
-            Console.WriteLine($"📄[AddAsync] Existing instance count: {instances.Count}");
-
+            var instances = await GetAllAsync(); 
             if (instances.All(i => i.Id != newInstance.Id))
             {
                 instances.Add(newInstance);
-                Console.WriteLine($"➕[AddAsync] Adding instance with ID {newInstance.Id}");
-
                 var json = JsonConvert.SerializeObject(instances, Formatting.Indented);
+
+                Console.WriteLine($"📝[AddAsync] Writing JSON: {json}");
+                
+                if (!Directory.Exists(Path.GetDirectoryName(LocalInstanceDbPath)!))
+                {
+                    Console.WriteLine("⚠️ [AddAsync] Directory does not exist. Creating...");
+                    Directory.CreateDirectory(Path.GetDirectoryName(LocalInstanceDbPath)!);
+                }
+
+
                 await File.WriteAllTextAsync(LocalInstanceDbPath, json);
 
-                Console.WriteLine($"✅[AddAsync] Successfully wrote to {LocalInstanceDbPath}");
+                Console.WriteLine($"✅[AddAsync] Write successful.");
             }
             else
             {
-                Console.WriteLine($"⚠️[AddAsync] Instance ID {newInstance.Id} already exists.");
+                Console.WriteLine($"ℹ️[AddAsync] Instance {newInstance.Id} already exists.");
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"❌[AddAsync] Failed to write instance JSON: {ex.Message}");
-            throw;
+            Console.WriteLine($"❌[AddAsync] Exception: {ex.Message}");
         }
         finally
         {
             Semaphore.Release();
         }
     }
-
-
-
+    
     public async Task RemoveAsync(long instanceId)
     {
         
