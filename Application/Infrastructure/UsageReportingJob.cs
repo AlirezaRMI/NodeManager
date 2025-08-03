@@ -1,6 +1,5 @@
 ﻿using Application.Client;
 using Application.Services.Interfaces;
-using Domain.DTOs.Instance;
 using Domain.Model;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
