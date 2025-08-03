@@ -6,7 +6,7 @@ namespace Application.Services.implementations;
 
 public class LocalInstanceStore : ILocalInstanceStore
 {
-    private const string DbPath = "instances.json";
+    private const string DbPath = "/var/lib/easyhub-instance-data/instances.json";
     private static readonly SemaphoreSlim Semaphore = new(1, 1);
 
     public async Task<List<InstanceInfo>> GetAllAsync()
@@ -14,7 +14,7 @@ public class LocalInstanceStore : ILocalInstanceStore
         await Semaphore.WaitAsync();
         try
         {
-            if (!File.Exists(DbPath)) return new List<InstanceInfo>();
+            if (!File.Exists(DbPath)) return [];
             var json = await File.ReadAllTextAsync(DbPath);
             return JsonConvert.DeserializeObject<List<InstanceInfo>>(json) ?? new List<InstanceInfo>();
         }

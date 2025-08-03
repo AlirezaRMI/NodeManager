@@ -60,9 +60,9 @@ public class NodeService(IDockerService docker, ILogger<INodeService> logger,ILo
 
         await docker.StartContainerAsync(containerId);
         
-        // await localInstanceStore.AddAsync(new InstanceInfo { Id = r.InstanceId });
-        //
-        // logger.LogInformation("Container started ({Id})", containerId);
+        await localInstanceStore.AddAsync(new InstanceInfo { Id = r.InstanceId });
+        
+        logger.LogInformation("Container started ({Id})", containerId);
         
         return new ProvisionResponseDto
         {
