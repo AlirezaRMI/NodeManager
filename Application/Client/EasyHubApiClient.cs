@@ -16,15 +16,20 @@ public class EasyHubApiClient(
         httpClient.DefaultRequestHeaders.Accept.Add(
             new MediaTypeWithQualityHeaderValue("application/json"));
 
-        httpClient.BaseAddress = new Uri(options.Value.Url!);
+        httpClient.BaseAddress = new Uri(options.Value.Url!.TrimEnd('/'));
 
         var requestUrl = EasyHubUrlPath.UpdateUsage;
         logger.LogInformation("Submitting usage report to EasyHub at {Url}", requestUrl);
 
         try
         {
-            var response = await httpClient.PostAsJsonAsync(requestUrl, report);
-
+            var jsonContent = JsonContent.Create(report);
+            
+            var request = new HttpRequestMessage(HttpMethod.Post, requestUrl)
+            {
+                Content = jsonContent
+            };
+            var response = await httpClient.SendAsync(request);
             if (!response.IsSuccessStatusCode)
             {
                 var errorContent = await response.Content.ReadAsStringAsync();
