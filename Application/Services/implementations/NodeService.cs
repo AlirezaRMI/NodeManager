@@ -12,7 +12,7 @@ namespace Application.Services.implementations;
 public class NodeService(IDockerService docker, ILogger<INodeService> logger,ILocalInstanceStore localInstanceStore) : INodeService
 {
     
-    private const string LocalInstanceDbPath = "instances.json";
+    private const string LocalInstanceDbPath = "/var/lib/easyhub-instance-data/instances.json";
     public async Task<ProvisionResponseDto> ProvisionContainerAsync(ProvisionRequestDto r)
     {
         logger.LogInformation("Provision request for Instance {Id}", r.InstanceId);
