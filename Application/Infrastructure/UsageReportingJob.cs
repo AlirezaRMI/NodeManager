@@ -16,7 +16,6 @@ public class UsageReportingJob(IServiceProvider serviceProvider, ILogger<UsageRe
     public Task StartAsync(CancellationToken cancellationToken)
     {
         logger.LogInformation("🟢 Usage Reporting Job is starting.");
-        
         _timer = new Timer(DoWork, null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
         return Task.CompletedTask;
     }
@@ -29,18 +28,17 @@ public class UsageReportingJob(IServiceProvider serviceProvider, ILogger<UsageRe
             using var scope = serviceProvider.CreateScope();
             var nodeService = scope.ServiceProvider.GetRequiredService<INodeService>();
             var easyHubClient = scope.ServiceProvider.GetRequiredService<IEasyHubApiClient>();
-            var localInstanceStore = scope.ServiceProvider.GetRequiredService<ILocalInstanceStore>();
+            var localInstanceStore = scope.ServiceProvider.GetRequiredService<ILocalInstanceStore>(); 
 
-            
             var localInstances = await localInstanceStore.GetAllAsync();
+
             if (!localInstances.Any())
             {
                 logger.LogWarning("⚠️ No local instances found. Skipping report submission.");
                 return;
             }
-
+            
             logger.LogInformation("📦 Found {Count} local instance(s).", localInstances.Count);
-
             var report = new UsageReportDto();
 
             foreach (var instance in localInstances)
@@ -48,32 +46,25 @@ public class UsageReportingJob(IServiceProvider serviceProvider, ILogger<UsageRe
                 logger.LogInformation("📍 Processing instance {InstanceId}", instance.Id);
                 try
                 {
-                    
                     var trafficJson = await nodeService.GetInstanceTrafficAsync(instance.Id);
                     if (string.IsNullOrWhiteSpace(trafficJson)) continue;
 
                     var currentTraffic = JsonConvert.DeserializeObject<TrafficUsageDto>(trafficJson);
                     if (currentTraffic == null) continue;
 
-                    
                     long usageDelta = 0;
-
-                    
                     if (instance.LastTotalRx > 0 || instance.LastTotalTx > 0)
                     {
-                        if (currentTraffic.TotalBytesIn >= instance.LastTotalRx &&
-                            currentTraffic.TotalBytesOut >= instance.LastTotalTx)
+                        if (currentTraffic.TotalBytesIn >= instance.LastTotalRx && currentTraffic.TotalBytesOut >= instance.LastTotalTx)
                         {
-                            var rxDelta = currentTraffic.TotalBytesIn - instance.LastTotalRx;
-                            var txDelta = currentTraffic.TotalBytesOut - instance.LastTotalTx;
-                            usageDelta = rxDelta + txDelta;
+                            usageDelta = (currentTraffic.TotalBytesIn - instance.LastTotalRx) + 
+                                         (currentTraffic.TotalBytesOut - instance.LastTotalTx);
                         }
                     }
-
+                    
                     if (usageDelta > 0)
                     {
-                        logger.LogInformation("📊 Usage for instance {InstanceId} in this interval: {Bytes} bytes",
-                            instance.Id, usageDelta);
+                        logger.LogInformation("📊 Usage for instance {InstanceId} in this interval: {Bytes} bytes", instance.Id, usageDelta);
                         report.Usages.Add(new InstanceUsageData
                         {
                             InstanceId = instance.Id,
@@ -82,9 +73,9 @@ public class UsageReportingJob(IServiceProvider serviceProvider, ILogger<UsageRe
                     }
                     else
                     {
-                        logger.LogInformation("ℹ️ No new usage for instance {InstanceId} in this interval.",
-                            instance.Id);
+                        logger.LogInformation("ℹ️ No new usage for instance {InstanceId} in this interval.", instance.Id);
                     }
+                    
                     instance.LastTotalRx = currentTraffic.TotalBytesIn;
                     instance.LastTotalTx = currentTraffic.TotalBytesOut;
 
@@ -98,8 +89,6 @@ public class UsageReportingJob(IServiceProvider serviceProvider, ILogger<UsageRe
 
             if (report.Usages.Any())
             {
-                logger.LogInformation("📤 Submitting usage report with {Count} usage item(s) to EasyHub.",
-                    report.Usages.Count);
                 await easyHubClient.SubmitUsageAsync(report);
                 logger.LogInformation("✅ Successfully submitted usage report.");
             }
