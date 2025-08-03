@@ -35,12 +35,6 @@ else
     echo "Updating existing NodeManager repository..."
     sudo git -C "$INSTALL_DIR" pull
 fi
-SNIFFER_IMAGE="ghcr.io/alirezarmi/sniffer:v1.1.0"
-echo "Removing cached sniffer image if exists..."
-sudo docker image rm -f "$SNIFFER_IMAGE" 2>/dev/null || true
-
-echo "Pulling the latest sniffer image from GitHub Container Registry..."
-sudo docker pull "$SNIFFER_IMAGE"
 
 cd "$INSTALL_DIR"
 if [ -f "compose.yml" ]; then
