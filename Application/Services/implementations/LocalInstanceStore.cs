@@ -1,5 +1,6 @@
 ﻿using Application.Services.Interfaces;
 using Domain.DTOs.Instance;
+using Domain.Model;
 using Newtonsoft.Json;
 
 namespace Application.Services.implementations;
@@ -86,6 +87,26 @@ public class LocalInstanceStore : ILocalInstanceStore
                 instances.Remove(instanceToRemove);
                 await WriteInstancesToFileAsync(instances);
                 Console.WriteLine($"✅[RemoveAsync] Instance {instanceId} removed successfully.");
+            }
+        }
+        finally
+        {
+            Semaphore.Release();
+        }
+    }
+
+    public async Task UpdateAsync(InstanceInfo instanceToUpdate)
+    {
+        await Semaphore.WaitAsync();
+        try
+        {
+            var instances = await ReadInstancesFromFileAsync();
+            var instanceIndex = instances.FindIndex(i => i.Id == instanceToUpdate.Id);
+
+            if (instanceIndex != -1)
+            {
+                instances[instanceIndex] = instanceToUpdate;
+                await WriteInstancesToFileAsync(instances);
             }
         }
         finally

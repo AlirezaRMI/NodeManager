@@ -1,4 +1,5 @@
 ﻿using Domain.DTOs.Instance;
+using Domain.Model;
 
 namespace Application.Services.Interfaces;
 
@@ -21,4 +22,11 @@ public interface ILocalInstanceStore
     /// <param name="instanceId"></param>
     /// <returns></returns>
     Task RemoveAsync(long instanceId);
+    
+    /// <summary>
+    /// this for update saved traffics
+    /// </summary>
+    /// <param name="instanceToUpdate"></param>
+    /// <returns></returns>
+    Task UpdateAsync(InstanceInfo instanceToUpdate);
 }

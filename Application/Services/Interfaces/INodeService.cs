@@ -1,4 +1,5 @@
 ﻿using Domain.DTOs.Instance;
+using Domain.Model;
 using Domain.Models.Provision;
 
 namespace Application.Services.Interfaces;

@@ -16,7 +16,8 @@ public class UsageReportingJob(IServiceProvider serviceProvider, ILogger<UsageRe
     public Task StartAsync(CancellationToken cancellationToken)
     {
         logger.LogInformation("🟢 Usage Reporting Job is starting.");
-        _timer = new Timer(DoWork, null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(2));
+        
+        _timer = new Timer(DoWork, null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
         return Task.CompletedTask;
     }
 
@@ -28,50 +29,66 @@ public class UsageReportingJob(IServiceProvider serviceProvider, ILogger<UsageRe
             using var scope = serviceProvider.CreateScope();
             var nodeService = scope.ServiceProvider.GetRequiredService<INodeService>();
             var easyHubClient = scope.ServiceProvider.GetRequiredService<IEasyHubApiClient>();
+            var localInstanceStore = scope.ServiceProvider.GetRequiredService<ILocalInstanceStore>();
 
-            var localInstances = await nodeService.GetAllLocalInstancesAsync();
-            var instanceInfos = localInstances as InstanceInfo[] ?? localInstances.ToArray();
-            logger.LogInformation("📦 Found {Count} local instance(s).", instanceInfos.Length);
-
-            if (!instanceInfos.Any())
+            
+            var localInstances = await localInstanceStore.GetAllAsync();
+            if (!localInstances.Any())
             {
                 logger.LogWarning("⚠️ No local instances found. Skipping report submission.");
                 return;
             }
 
+            logger.LogInformation("📦 Found {Count} local instance(s).", localInstances.Count);
+
             var report = new UsageReportDto();
 
-            foreach (var instance in instanceInfos)
+            foreach (var instance in localInstances)
             {
                 logger.LogInformation("📍 Processing instance {InstanceId}", instance.Id);
-
                 try
                 {
+                    
                     var trafficJson = await nodeService.GetInstanceTrafficAsync(instance.Id);
+                    if (string.IsNullOrWhiteSpace(trafficJson)) continue;
 
-                    if (string.IsNullOrWhiteSpace(trafficJson))
+                    var currentTraffic = JsonConvert.DeserializeObject<TrafficUsageDto>(trafficJson);
+                    if (currentTraffic == null) continue;
+
+                    
+                    long usageDelta = 0;
+
+                    
+                    if (instance.LastTotalRx > 0 || instance.LastTotalTx > 0)
                     {
-                        logger.LogWarning("⚠️ Empty traffic data for instance {InstanceId}", instance.Id);
-                        continue;
+                        if (currentTraffic.TotalBytesIn >= instance.LastTotalRx &&
+                            currentTraffic.TotalBytesOut >= instance.LastTotalTx)
+                        {
+                            var rxDelta = currentTraffic.TotalBytesIn - instance.LastTotalRx;
+                            var txDelta = currentTraffic.TotalBytesOut - instance.LastTotalTx;
+                            usageDelta = rxDelta + txDelta;
+                        }
                     }
 
-                    var trafficData = JsonConvert.DeserializeObject<TrafficUsageDto>(trafficJson);
-                    if (trafficData == null)
+                    if (usageDelta > 0)
                     {
-                        logger.LogWarning("⚠️ Failed to deserialize traffic data for instance {InstanceId}",
+                        logger.LogInformation("📊 Usage for instance {InstanceId} in this interval: {Bytes} bytes",
+                            instance.Id, usageDelta);
+                        report.Usages.Add(new InstanceUsageData
+                        {
+                            InstanceId = instance.Id,
+                            TotalUsageInBytes = usageDelta
+                        });
+                    }
+                    else
+                    {
+                        logger.LogInformation("ℹ️ No new usage for instance {InstanceId} in this interval.",
                             instance.Id);
-                        continue;
                     }
+                    instance.LastTotalRx = currentTraffic.TotalBytesIn;
+                    instance.LastTotalTx = currentTraffic.TotalBytesOut;
 
-                    var totalUsage = trafficData.TotalBytesIn + trafficData.TotalBytesOut;
-                    logger.LogInformation("📊 Total usage for instance {InstanceId}: {Bytes} bytes", instance.Id,
-                        totalUsage);
-
-                    report.Usages.Add(new InstanceUsageData
-                    {
-                        InstanceId = instance.Id,
-                        TotalUsageInBytes = totalUsage
-                    });
+                    await localInstanceStore.UpdateAsync(instance);
                 }
                 catch (Exception ex)
                 {
@@ -88,7 +105,7 @@ public class UsageReportingJob(IServiceProvider serviceProvider, ILogger<UsageRe
             }
             else
             {
-                logger.LogWarning("⚠️ Usage report is empty — nothing to submit.");
+                logger.LogWarning("⚠️ No usage to report in this cycle.");
             }
         }
         catch (Exception ex)
