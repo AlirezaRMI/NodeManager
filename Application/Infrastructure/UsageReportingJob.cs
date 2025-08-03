@@ -8,7 +8,8 @@ using Newtonsoft.Json;
 
 namespace Application.Infrastructure;
 
-public class UsageReportingJob(IServiceProvider serviceProvider, ILogger<UsageReportingJob> logger) : IHostedService, IDisposable
+public class UsageReportingJob(IServiceProvider serviceProvider, ILogger<UsageReportingJob> logger)
+    : IHostedService, IDisposable
 {
     private Timer? _timer;
 
@@ -19,7 +20,7 @@ public class UsageReportingJob(IServiceProvider serviceProvider, ILogger<UsageRe
         return Task.CompletedTask;
     }
 
-    private void DoWork(object? state)
+    private async void DoWork(object? state)
     {
         logger.LogInformation("🔁 Usage Reporting Job triggered at {Time}", DateTime.UtcNow);
         try
@@ -28,7 +29,7 @@ public class UsageReportingJob(IServiceProvider serviceProvider, ILogger<UsageRe
             var nodeService = scope.ServiceProvider.GetRequiredService<INodeService>();
             var easyHubClient = scope.ServiceProvider.GetRequiredService<IEasyHubApiClient>();
 
-            var localInstances = nodeService.GetAllLocalInstancesAsync().GetAwaiter().GetResult();
+            var localInstances = await nodeService.GetAllLocalInstancesAsync();
             var instanceInfos = localInstances as InstanceInfo[] ?? localInstances.ToArray();
             logger.LogInformation("📦 Found {Count} local instance(s).", instanceInfos.Length);
 
@@ -46,7 +47,7 @@ public class UsageReportingJob(IServiceProvider serviceProvider, ILogger<UsageRe
 
                 try
                 {
-                    var trafficJson = nodeService.GetInstanceTrafficAsync(instance.Id).GetAwaiter().GetResult();
+                    var trafficJson = await nodeService.GetInstanceTrafficAsync(instance.Id);
 
                     if (string.IsNullOrWhiteSpace(trafficJson))
                     {
@@ -54,15 +55,17 @@ public class UsageReportingJob(IServiceProvider serviceProvider, ILogger<UsageRe
                         continue;
                     }
 
-                    var trafficData = JsonConvert.DeserializeObject<Dictionary<string, TrafficUsageDto>>(trafficJson);
+                    var trafficData = JsonConvert.DeserializeObject<TrafficUsageDto>(trafficJson);
                     if (trafficData == null)
                     {
-                        logger.LogWarning("⚠️ Failed to deserialize traffic data for instance {InstanceId}", instance.Id);
+                        logger.LogWarning("⚠️ Failed to deserialize traffic data for instance {InstanceId}",
+                            instance.Id);
                         continue;
                     }
 
-                    long totalUsage = trafficData.Values.Sum(v => v.TotalBytesIn + v.TotalBytesOut);
-                    logger.LogInformation("📊 Total usage for instance {InstanceId}: {Bytes} bytes", instance.Id, totalUsage);
+                    var totalUsage = trafficData.TotalBytesIn + trafficData.TotalBytesOut;
+                    logger.LogInformation("📊 Total usage for instance {InstanceId}: {Bytes} bytes", instance.Id,
+                        totalUsage);
 
                     report.Usages.Add(new InstanceUsageData
                     {
@@ -78,8 +81,9 @@ public class UsageReportingJob(IServiceProvider serviceProvider, ILogger<UsageRe
 
             if (report.Usages.Any())
             {
-                logger.LogInformation("📤 Submitting usage report with {Count} usage item(s) to EasyHub.", report.Usages.Count);
-                easyHubClient.SubmitUsageAsync(report).GetAwaiter().GetResult();
+                logger.LogInformation("📤 Submitting usage report with {Count} usage item(s) to EasyHub.",
+                    report.Usages.Count);
+                await easyHubClient.SubmitUsageAsync(report);
                 logger.LogInformation("✅ Successfully submitted usage report.");
             }
             else
