@@ -26,14 +26,25 @@ public class LocalInstanceStore : ILocalInstanceStore
 
     public async Task AddAsync(InstanceInfo newInstance)
     {
+        
         await Semaphore.WaitAsync();
         try
         {
+            var directory = Path.GetDirectoryName(DbPath);
+            if (!Directory.Exists(directory))
+            {
+                Directory.CreateDirectory(directory!);
+            }
             var instances = await GetAllAsync(); 
             if (instances.All(i => i.Id != newInstance.Id))
             {
                 instances.Add(newInstance);
                 var json = JsonConvert.SerializeObject(instances, Formatting.Indented);
+                if (!Directory.Exists(directory) || !new DirectoryInfo(directory!).Attributes.HasFlag(FileAttributes.Directory))
+                {
+                    throw new Exception($"Directory {directory} is not accessible or not a directory");
+                }
+
                 await File.WriteAllTextAsync(DbPath, json);
             }
         }
@@ -45,15 +56,26 @@ public class LocalInstanceStore : ILocalInstanceStore
 
     public async Task RemoveAsync(long instanceId)
     {
+        
         await Semaphore.WaitAsync();
         try
         {
+            var directory = Path.GetDirectoryName(DbPath);
+            if (!Directory.Exists(directory))
+            {
+                Directory.CreateDirectory(directory!);
+            }
             var instances = await GetAllAsync();
             var instanceToRemove = instances.FirstOrDefault(i => i.Id == instanceId);
             if (instanceToRemove != null)
             {
                 instances.Remove(instanceToRemove);
                 var json = JsonConvert.SerializeObject(instances, Formatting.Indented);
+                if (!Directory.Exists(directory) || !new DirectoryInfo(directory!).Attributes.HasFlag(FileAttributes.Directory))
+                {
+                    throw new Exception($"Directory {directory} is not accessible or not a directory");
+                }
+
                 await File.WriteAllTextAsync(DbPath, json);
             }
         }

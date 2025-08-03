@@ -8,11 +8,11 @@ using Newtonsoft.Json;
 
 namespace Application.Services.implementations;
 
-
-public class NodeService(IDockerService docker, ILogger<INodeService> logger,ILocalInstanceStore localInstanceStore) : INodeService
+public class NodeService(IDockerService docker, ILogger<INodeService> logger, ILocalInstanceStore localInstanceStore)
+    : INodeService
 {
-    
     private const string LocalInstanceDbPath = "/var/lib/easyhub-instance-data/instances.json";
+
     public async Task<ProvisionResponseDto> ProvisionContainerAsync(ProvisionRequestDto r)
     {
         logger.LogInformation("Provision request for Instance {Id}", r.InstanceId);
@@ -25,7 +25,7 @@ public class NodeService(IDockerService docker, ILogger<INodeService> logger,ILo
 
         await docker.CreateDirectoryOnHostAsync(sslDir);
         await docker.WriteFileOnHostAsync(pemPath, r.CertificateKey!);
-        ;
+
 
         await docker.OpenFirewallPortAsync(r.InboundPort);
         await docker.OpenFirewallPortAsync(r.XrayPort);
@@ -59,11 +59,11 @@ public class NodeService(IDockerService docker, ILogger<INodeService> logger,ILo
             volumeMappings: volumes);
 
         await docker.StartContainerAsync(containerId);
-        
+
         await localInstanceStore.AddAsync(new InstanceInfo { Id = r.InstanceId });
-        
+
         logger.LogInformation("Container started ({Id})", containerId);
-        
+
         return new ProvisionResponseDto
         {
             ProvisionedInstanceId = r.InstanceId,
@@ -73,7 +73,7 @@ public class NodeService(IDockerService docker, ILogger<INodeService> logger,ILo
         };
     }
 
-    public async Task<string> DeprovisionContainerAsync(string id,long instanceId)
+    public async Task<string> DeprovisionContainerAsync(string id, long instanceId)
     {
         await docker.StopContainerAsync(id);
         await docker.DeleteContainerAsync(id);
@@ -82,15 +82,27 @@ public class NodeService(IDockerService docker, ILogger<INodeService> logger,ILo
     }
 
     public Task<string> GetContainerStatusAsync(string id) => docker.GetContainerStatusAsync(id);
-    public Task<string> GetContainerLogsAsync(string id)   => docker.GetContainerLogsAsync(id);
-    public Task<string> PauseContainerAsync(string id) {  docker.PauseContainerAsync(id);   return Task.FromResult($"{id} paused"); }
-    public Task<string> ResumeContainerAsync(string id) { docker.UnpauseContainerAsync(id); return Task.FromResult($"{id} resumed"); }
+    public Task<string> GetContainerLogsAsync(string id) => docker.GetContainerLogsAsync(id);
+
+    public Task<string> PauseContainerAsync(string id)
+    {
+        docker.PauseContainerAsync(id);
+        return Task.FromResult($"{id} paused");
+    }
+
+    public Task<string> ResumeContainerAsync(string id)
+    {
+        docker.UnpauseContainerAsync(id);
+        return Task.FromResult($"{id} resumed");
+    }
+
     public async Task<IEnumerable<InstanceInfo>> GetAllLocalInstancesAsync()
     {
         if (!File.Exists(LocalInstanceDbPath))
         {
             return [];
         }
+
         var json = await File.ReadAllTextAsync(LocalInstanceDbPath);
         return JsonConvert.DeserializeObject<List<InstanceInfo>>(json) ?? new List<InstanceInfo>();
     }
@@ -98,9 +110,11 @@ public class NodeService(IDockerService docker, ILogger<INodeService> logger,ILo
     public async Task<string> GetInstanceTrafficAsync(long instanceId)
     {
         var mainContainerName = $"easyhub-xray-{instanceId}";
-        var rx = await docker.ExecuteCommandInContainerAsync(mainContainerName, ["cat", "/sys/class/net/eth0/statistics/rx_bytes"
+        var rx = await docker.ExecuteCommandInContainerAsync(mainContainerName, [
+            "cat", "/sys/class/net/eth0/statistics/rx_bytes"
         ]);
-        var tx = await docker.ExecuteCommandInContainerAsync(mainContainerName, ["cat", "/sys/class/net/eth0/statistics/tx_bytes"
+        var tx = await docker.ExecuteCommandInContainerAsync(mainContainerName, [
+            "cat", "/sys/class/net/eth0/statistics/tx_bytes"
         ]);
         var traffic = new
         {
@@ -109,5 +123,4 @@ public class NodeService(IDockerService docker, ILogger<INodeService> logger,ILo
         };
         return JsonConvert.SerializeObject(traffic);
     }
-
 }
