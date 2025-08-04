@@ -1,13 +1,12 @@
-﻿using System.Text.Json.Serialization;
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
 
 namespace Domain.Model;
 
 public class TrafficUsageDto
 {
-    [JsonPropertyName("TotalBytesIn")]
+    [JsonProperty("TotalBytesIn")]
     public long TotalBytesIn { get; set; }
 
-    [JsonPropertyName("TotalBytesOut")]
+    [JsonProperty("TotalBytesOut")]
     public long TotalBytesOut { get; set; }
 }
