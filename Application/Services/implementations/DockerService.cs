@@ -9,16 +9,9 @@ using Microsoft.Extensions.Logging;
 
 namespace Application.Services.implementations;
 
-public sealed class DockerService : IDockerService
+public sealed class DockerService(IDockerClient client,ILogger logger) : IDockerService
 {
-    private readonly IDockerClient _docker;
-    private readonly ILogger<DockerService> _log;
 
-    public DockerService(IDockerClient dockerClient, ILogger<DockerService> logger)
-    {
-        _docker = dockerClient;
-        _log    = logger;
-    }
 
     
 
@@ -82,24 +75,24 @@ public sealed class DockerService : IDockerService
             HostConfig   = hostConfig,
         };
 
-        _log.LogInformation("Creating container {Name} ({Image}) ...", containerName, imageName);
-        var resp = await _docker.Containers.CreateContainerAsync(create);
+        logger.LogInformation("Creating container {Name} ({Image}) ...", containerName, imageName);
+        var resp = await client.Containers.CreateContainerAsync(create);
         return resp.ID;
     }
 
-    public Task StartContainerAsync (string id) => _docker.Containers.StartContainerAsync(id,new());
-    public Task StopContainerAsync  (string id) => _docker.Containers.StopContainerAsync (id,new());
-    public Task DeleteContainerAsync(string id) => _docker.Containers.RemoveContainerAsync(id,new(){Force=true});
+    public Task StartContainerAsync (string id) => client.Containers.StartContainerAsync(id,new ContainerStartParameters());
+    public Task StopContainerAsync  (string id) => client.Containers.StopContainerAsync (id,new ContainerStopParameters());
+    public Task DeleteContainerAsync(string id) => client.Containers.RemoveContainerAsync(id,new ContainerRemoveParameters {Force=true});
 
     public async Task<string> GetContainerStatusAsync(string id)
-        => (await _docker.Containers.InspectContainerAsync(id)).State?.Status ?? "unknown";
+        => (await client.Containers.InspectContainerAsync(id)).State?.Status ?? "unknown";
 
     
 
     public async Task<string> GetContainerLogsAsync(string id)
     {
         var p = new ContainerLogsParameters { ShowStdout = true, ShowStderr = true };
-        await using var stream = await _docker.Containers.GetContainerLogsAsync(id, p, CancellationToken.None);
+        await using var stream = await client.Containers.GetContainerLogsAsync(id, p, CancellationToken.None);
         using var mux = new MultiplexedStream(stream, true);
 
         var (outBuf, errBuf) = await DemuxAsync(mux);
@@ -108,16 +101,16 @@ public sealed class DockerService : IDockerService
 
     public async Task<string> ExecuteCommandInContainerAsync(string id, string[] cmd)
     {
-        var exec = await _docker.Exec.ExecCreateContainerAsync(id,
-                     new() { Cmd = cmd, AttachStdout = true, AttachStderr = true });
+        var exec = await client.Exec.ExecCreateContainerAsync(id,
+                     new ContainerExecCreateParameters { Cmd = cmd, AttachStdout = true, AttachStderr = true });
 
-        using var stream = await _docker.Exec.StartAndAttachContainerExecAsync(exec.ID, false);
+        using var stream = await client.Exec.StartAndAttachContainerExecAsync(exec.ID, false);
         var (stdout, _)  = await DemuxAsync(stream);
         return stdout.Trim();
     }
 
-    public Task PauseContainerAsync  (string id) => _docker.Containers.PauseContainerAsync  (id);
-    public Task UnpauseContainerAsync(string id) => _docker.Containers.UnpauseContainerAsync(id);
+    public Task PauseContainerAsync  (string id) => client.Containers.PauseContainerAsync  (id);
+    public Task UnpauseContainerAsync(string id) => client.Containers.UnpauseContainerAsync(id);
 
     public Task CreateDirectoryOnHostAsync(string path)
         => Shell("mkdir", $"-p {path}");
@@ -139,7 +132,7 @@ public sealed class DockerService : IDockerService
 
     private async Task EnsureImageAsync(string image)
     {
-        var images = await _docker.Images.ListImagesAsync(new ImagesListParameters
+        var images = await client.Images.ListImagesAsync(new ImagesListParameters
         {
             Filters = new Dictionary<string, IDictionary<string, bool>>
             {
@@ -150,8 +143,8 @@ public sealed class DockerService : IDockerService
 
         if (images.Count == 0)
         {
-            _log.LogInformation("Pulling Docker image {Image} ...", image);
-            await _docker.Images.CreateImageAsync(
+            logger.LogInformation("Pulling Docker image {Image} ...", image);
+            await client.Images.CreateImageAsync(
                 new ImagesCreateParameters { FromImage = image, Tag = "latest" },
                 null,
                 new Progress<JSONMessage>());
@@ -160,7 +153,7 @@ public sealed class DockerService : IDockerService
 
     private async Task RemoveExistingContainerIfAny(string name)
     {
-        var containers = await _docker.Containers.ListContainersAsync(new()
+        var containers = await client.Containers.ListContainersAsync(new()
         {
             All     = true,
             Filters = new Dictionary<string, IDictionary<string, bool>>
@@ -171,8 +164,8 @@ public sealed class DockerService : IDockerService
 
         foreach (var c in containers)
         {
-            _log.LogWarning("Removing existing container {Name} ({Id})", name, c.ID);
-            await _docker.Containers.RemoveContainerAsync(c.ID, new() { Force = true });
+            logger.LogWarning("Removing existing container {Name} ({Id})", name, c.ID);
+            await client.Containers.RemoveContainerAsync(c.ID, new() { Force = true });
         }
     }
     

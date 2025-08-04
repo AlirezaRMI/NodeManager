@@ -102,7 +102,6 @@ public class NodeService(IDockerService docker, ILogger<INodeService> logger, IL
         {
             return [];
         }
-
         var json = await File.ReadAllTextAsync(LocalInstanceDbPath);
         return JsonConvert.DeserializeObject<List<InstanceInfo>>(json) ?? new List<InstanceInfo>();
     }
