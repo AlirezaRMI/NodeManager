@@ -2,5 +2,5 @@
 
 public class EasyHubUrlPath
 {
-    internal const string UpdateUsage = "/api/Instance/report";
+    internal const string UpdateUsage = "/api/instance/report";
 }
