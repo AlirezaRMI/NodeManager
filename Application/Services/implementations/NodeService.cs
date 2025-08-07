@@ -93,7 +93,7 @@ public class NodeService(IDockerService docker, ILogger<INodeService> logger, IL
     public Task<string> ResumeContainerAsync(string id)
     {
         docker.UnpauseContainerAsync(id);
-        return Task.FromResult($"{id} resumed");
+        return Task.FromResult($"{id} unpause");
     }
 
     public async Task<IEnumerable<InstanceInfo>> GetAllLocalInstancesAsync()

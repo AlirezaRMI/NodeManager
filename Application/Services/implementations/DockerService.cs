@@ -9,7 +9,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Application.Services.implementations;
 
-public sealed class DockerService(IDockerClient client,ILogger logger) : IDockerService
+public sealed class DockerService(IDockerClient client,ILogger<IDockerService> logger) : IDockerService
 {
 
 

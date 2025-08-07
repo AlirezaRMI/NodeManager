@@ -63,7 +63,7 @@ namespace Api.Controllers
             return Ok(await service.PauseContainerAsync(containerId));
         }
 
-        [HttpPost("container/{containerId}/resume")]
+        [HttpPost("container/{containerId}/unpause")]
         [EndpointName("resume Container")]
         [EndpointSummary("resumes (unpauses) the specified container.")]
         [ProducesResponseType(typeof(string), StatusCodes.Status200OK)]
