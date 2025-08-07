@@ -45,8 +45,8 @@ public class NodeService(IDockerService docker, ILogger<INodeService> logger, IL
         var ports = new List<string>
         {
             $"{r.InboundPort}:{r.InboundPort}",
-            $"{r.XrayPort}:{r.ApiPort}",
-            $"{r.ApiPort}:{r.XrayPort}"
+            $"{r.XrayPort}:62051",
+            $"{r.ApiPort}:62050"
         };
 
         var mainContainerName = $"easyhub-xray-{r.InstanceId}";
