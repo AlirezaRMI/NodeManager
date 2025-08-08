@@ -333,6 +333,9 @@
       "Domain/1.0.0": {
         "type": "project",
         "framework": ".NETCoreApp,Version=v9.0",
+        "dependencies": {
+          "Newtonsoft.Json": "13.0.3"
+        },
         "compile": {
           "bin/placeholder/Domain.dll": {}
         },
