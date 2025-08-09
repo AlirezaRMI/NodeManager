@@ -20,11 +20,11 @@ public class LocalInstanceStore : ILocalInstanceStore
             }
 
             await File.WriteAllTextAsync(LocalInstanceDbPath, "[]");
-            return new List<InstanceInfo>();
+            return [];
         }
 
         var json = await File.ReadAllTextAsync(LocalInstanceDbPath);
-        return JsonConvert.DeserializeObject<List<InstanceInfo>>(json) ?? new List<InstanceInfo>();
+        return JsonConvert.DeserializeObject<List<InstanceInfo>>(json) ?? [];
     }
 
     private async Task WriteInstancesToFileAsync(List<InstanceInfo> instances)
