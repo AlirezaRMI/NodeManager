@@ -109,7 +109,7 @@ public sealed class DockerService(IDockerClient client,ILogger<IDockerService> l
         return stdout.Trim();
     }
 
-    public Task PauseContainerAsync  (string id) => client.Containers.PauseContainerAsync  (id);
+    public Task PauseContainerAsync (string id) => client.Containers.PauseContainerAsync(id);
     public Task UnpauseContainerAsync(string id) => client.Containers.UnpauseContainerAsync(id);
 
     public Task CreateDirectoryOnHostAsync(string path)

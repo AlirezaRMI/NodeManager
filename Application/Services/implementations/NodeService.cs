@@ -84,16 +84,16 @@ public class NodeService(IDockerService docker, ILogger<INodeService> logger, IL
     public Task<string> GetContainerStatusAsync(string id) => docker.GetContainerStatusAsync(id);
     public Task<string> GetContainerLogsAsync(string id) => docker.GetContainerLogsAsync(id);
 
-    public Task<string> PauseContainerAsync(string id)
+    public async Task<string> PauseContainerAsync(string id)
     {
-        docker.PauseContainerAsync(id);
-        return Task.FromResult($"{id} paused");
+        await docker.PauseContainerAsync(id);
+        return $"{id} paused";
     }
 
-    public Task<string> ResumeContainerAsync(string id)
+    public async Task<string> ResumeContainerAsync(string id)
     {
-        docker.UnpauseContainerAsync(id);
-        return Task.FromResult($"{id} unpause");
+        await docker.UnpauseContainerAsync(id);
+        return $"{id} unpause";
     }
 
     public async Task<IEnumerable<InstanceInfo>> GetAllLocalInstancesAsync()

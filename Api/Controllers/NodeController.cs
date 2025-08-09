@@ -49,7 +49,7 @@ namespace Api.Controllers
         [ProducesResponseType(typeof(string), StatusCodes.Status404NotFound)]
         public async Task<IActionResult> GetContainerLogs([FromRoute] string containerId)
         {
-            string logs = await service.GetContainerLogsAsync(containerId);
+            var logs = await service.GetContainerLogsAsync(containerId);
             return Ok(logs);
         }
 
