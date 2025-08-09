@@ -11,10 +11,6 @@ namespace Application.Services.implementations;
 
 public sealed class DockerService(IDockerClient client,ILogger<IDockerService> logger) : IDockerService
 {
-
-
-    
-
     public async Task<string> CreateContainerAsync(
         string                    imageName,
         string                    containerName,
@@ -56,7 +52,11 @@ public sealed class DockerService(IDockerClient client,ILogger<IDockerService> l
                     Target = s[1],
                     ReadOnly = s.Length > 2 && s[2].Contains("ro")
                 };
-            }).ToList()
+            }).ToList(),
+            RestartPolicy = new RestartPolicy
+            {
+                Name = RestartPolicyKind.Always
+            }
         };
         if (!string.IsNullOrEmpty(networkMode))
         {
