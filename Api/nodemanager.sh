@@ -98,6 +98,7 @@ Requires=docker.service
 [Service]
 Restart=always
 RestartSec=10s
+ExecStartPre=/bin/bash -c 'while ! iptables -L DOCKER-USER >/dev/null 2>&1; do echo "Waiting for Docker iptables chain..."; sleep 1; done'
 ExecStartPre=-/usr/bin/docker stop nodemanager
 ExecStartPre=-/usr/bin/docker rm nodemanager
 ExecStart=/usr/bin/docker run --name nodemanager --privileged -p 5050:8080 -v /var/run/docker.sock:/var/run/docker.sock -v /var/lib/easyhub-instance-data:/var/lib/easyhub-instance-data nodemanager:latest
