@@ -130,9 +130,11 @@ public sealed class DockerService(IDockerClient client, ILogger<IDockerService> 
 
         if (p.ExitCode != 0)
         {
-            throw new InvalidOperationException($"Host command '{command} {args}' failed → {stderr}");
+            if (!stderr.Contains("No chain/target/match by that name"))
+            {
+                throw new InvalidOperationException($"Host command '{command} {args}' failed → {stderr}");
+            }
         }
-
         return stdout;
     }
 

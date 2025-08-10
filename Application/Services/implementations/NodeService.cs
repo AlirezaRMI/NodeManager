@@ -116,34 +116,27 @@ public async Task<string> PauseContainerAsync(string id)
 
         var port = instance.InboundPort;
         
-        var iptablesOutput = await docker.ExecuteCommandOnHostAsync("iptables", "-L DOCKER -v -n -x");
+        var iptablesOutput = await docker.ExecuteCommandOnHostAsync("iptables", $"-t nat -L DOCKER -v -n -x");
 
-        long totalBytesIn = 0;
-        long totalBytesOut = 0;
-
-        var inboundRegex = new Regex($@"ACCEPT\s+tcp\s+--\s+.*\s+tcp\s+dpt:{port}");
-        var outboundRegex = new Regex($@"ACCEPT\s+tcp\s+--\s+.*\s+tcp\s+spt:{port}");
-
+        long totalBytes = 0;
+        
+        var regex = new Regex($@"dpt:{port}\s+to:.*");
+        
         var lines = iptablesOutput.Split('\n');
         foreach (var line in lines)
         {
             var trimmedLine = line.Trim();
-            var columns = trimmedLine.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-
-            if (columns.Length > 1)
+            if (regex.IsMatch(trimmedLine))
             {
-                if (inboundRegex.IsMatch(trimmedLine))
+                var columns = trimmedLine.Split([' '], StringSplitOptions.RemoveEmptyEntries);
+                if (columns.Length > 1)
                 {
-                    totalBytesIn += long.Parse(columns[1]);
-                }
-                else if (outboundRegex.IsMatch(trimmedLine))
-                {
-                    totalBytesOut += long.Parse(columns[1]);
+                    totalBytes += long.Parse(columns[1]);
                 }
             }
         }
         
-        var traffic = new { TotalBytesIn = totalBytesIn, TotalBytesOut = totalBytesOut };
+        var traffic = new { TotalBytesIn = totalBytes, TotalBytesOut = 0L };
         return JsonConvert.SerializeObject(traffic);
     }
 }
