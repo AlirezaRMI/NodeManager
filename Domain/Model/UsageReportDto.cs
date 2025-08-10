@@ -2,5 +2,5 @@
 
 public class UsageReportDto
 {
-    public List<InstanceUsageData> Usages { get; set; } = new();
+    public List<InstanceUsageData> Usages { get; set; } = [];
 }

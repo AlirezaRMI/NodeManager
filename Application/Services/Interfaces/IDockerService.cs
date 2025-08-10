@@ -95,4 +95,16 @@ public interface IDockerService
     /// </summary>
     /// <param name="containerId">The ID or name of the container to unpause.</param>
     Task UnpauseContainerAsync(string containerId);
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="port"></param>
+    /// <returns></returns>
+    Task AddTrafficCountingRuleAsync(int port);
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="port"></param>
+    /// <returns></returns>
+    Task RemoveTrafficCountingRuleAsync(int port);
 }
