@@ -39,7 +39,8 @@ public sealed class DockerService(IDockerClient client, ILogger<IDockerService> 
             Mounts = volumeMappings.Select(v =>
             {
                 var s = v.Split(':');
-                return new Mount { Type = "bind", Source = s[0], Target = s[1], ReadOnly = s.Length > 2 && s[2].Contains("ro") };
+                return new Mount
+                    { Type = "bind", Source = s[0], Target = s[1], ReadOnly = s.Length > 2 && s[2].Contains("ro") };
             }).ToList(),
             RestartPolicy = new RestartPolicy { Name = RestartPolicyKind.Always }
         };
@@ -61,11 +62,18 @@ public sealed class DockerService(IDockerClient client, ILogger<IDockerService> 
         return resp.ID;
     }
 
-    public Task StartContainerAsync(string id) => client.Containers.StartContainerAsync(id, new ContainerStartParameters());
-    public Task StopContainerAsync(string id) => client.Containers.StopContainerAsync(id, new ContainerStopParameters());
-    public Task DeleteContainerAsync(string id) => client.Containers.RemoveContainerAsync(id, new ContainerRemoveParameters { Force = true });
-    public async Task<string> GetContainerStatusAsync(string id) => (await client.Containers.InspectContainerAsync(id)).State?.Status ?? "unknown";
-    
+    public Task StartContainerAsync(string id) =>
+        client.Containers.StartContainerAsync(id, new ContainerStartParameters());
+
+    public Task StopContainerAsync(string id) =>
+        client.Containers.StopContainerAsync(id, new ContainerStopParameters());
+
+    public Task DeleteContainerAsync(string id) =>
+        client.Containers.RemoveContainerAsync(id, new ContainerRemoveParameters { Force = true });
+
+    public async Task<string> GetContainerStatusAsync(string id) =>
+        (await client.Containers.InspectContainerAsync(id)).State?.Status ?? "unknown";
+
     public async Task<string> GetContainerLogsAsync(string id)
     {
         var p = new ContainerLogsParameters { ShowStdout = true, ShowStderr = true };
@@ -77,12 +85,13 @@ public sealed class DockerService(IDockerClient client, ILogger<IDockerService> 
 
     public async Task<string> ExecuteCommandInContainerAsync(string id, string[] cmd)
     {
-        var exec = await client.Exec.ExecCreateContainerAsync(id, new ContainerExecCreateParameters { Cmd = cmd, AttachStdout = true, AttachStderr = true });
+        var exec = await client.Exec.ExecCreateContainerAsync(id,
+            new ContainerExecCreateParameters { Cmd = cmd, AttachStdout = true, AttachStderr = true });
         using var stream = await client.Exec.StartAndAttachContainerExecAsync(exec.ID, false);
         var (stdout, _) = await DemuxAsync(stream);
         return stdout.Trim();
     }
-    
+
     public Task PauseContainerAsync(string id) => client.Containers.PauseContainerAsync(id);
     public Task UnpauseContainerAsync(string id) => client.Containers.UnpauseContainerAsync(id);
     public Task CreateDirectoryOnHostAsync(string path) => Shell("mkdir", $"-p {path}");
@@ -91,37 +100,59 @@ public sealed class DockerService(IDockerClient client, ILogger<IDockerService> 
     {
         var tmp = Path.GetTempFileName();
         await File.WriteAllTextAsync(tmp, content);
-        try { await Shell("bash", $"-c \"cat '{tmp}' > '{filePath}'\""); }
-        finally { File.Delete(tmp); }
+        try
+        {
+            await Shell("bash", $"-c \"cat '{tmp}' > '{filePath}'\"");
+        }
+        finally
+        {
+            File.Delete(tmp);
+        }
     }
 
-    public Task OpenFirewallPortAsync(int p, string proto = "tcp") => Shell("ufw", $"allow {p}/{proto}", ignoreExists: true);
-    public Task CloseFirewallPortAsync(int p, string proto = "tcp") => Shell("ufw", $"delete allow {p}/{proto}", ignoreExists: true);
+    public Task OpenFirewallPortAsync(int p, string proto = "tcp") =>
+        Shell("ufw", $"allow {p}/{proto}", ignoreExists: true);
+
+    public Task CloseFirewallPortAsync(int p, string proto = "tcp") =>
+        Shell("ufw", $"delete allow {p}/{proto}", ignoreExists: true);
 
     public async Task AddTrafficCountingRuleAsync(int port)
     {
+        if (!await ChainExistsAsync("DOCKER-USER"))
+        {
+            logger.LogWarning("DOCKER-USER chain not found. Creating it now...");
+            await Shell("iptables", "-N DOCKER-USER");
+            await Shell("iptables", "-I FORWARD -j DOCKER-USER");
+        }
+
         await Shell("iptables", $"-I DOCKER-USER -p tcp --dport {port} -j RETURN");
         await Shell("iptables", $"-I DOCKER-USER -p tcp --sport {port} -j RETURN");
-        await Shell("netfilter-persistent", "save");
+
+        // await Shell("netfilter-persistent", "save");
     }
 
     public async Task RemoveTrafficCountingRuleAsync(int port)
     {
-        await Shell("iptables", $"-D DOCKER-USER -p tcp --dport {port} -j RETURN");
-        await Shell("iptables", $"-D DOCKER-USER -p tcp --sport {port} -j RETURN");
-        await Shell("netfilter-persistent", "save");
+        if (await ChainExistsAsync("DOCKER-USER"))
+        {
+            await Shell("iptables", $"-D DOCKER-USER -p tcp --dport {port} -j RETURN", ignoreExists: true);
+            await Shell("iptables", $"-D DOCKER-USER -p tcp --sport {port} -j RETURN", ignoreExists: true);
+            // await Shell("netfilter-persistent", "save");
+        }
     }
-    
+
     private async Task EnsureImageAsync(string image)
     {
         var images = await client.Images.ListImagesAsync(new ImagesListParameters
         {
-            Filters = new Dictionary<string, IDictionary<string, bool>> { ["reference"] = new Dictionary<string, bool> { [image] = default } }
+            Filters = new Dictionary<string, IDictionary<string, bool>>
+                { ["reference"] = new Dictionary<string, bool> { [image] = default } }
         });
         if (images.Count == 0)
         {
             logger.LogInformation("Pulling Docker image {Image} ...", image);
-            await client.Images.CreateImageAsync(new ImagesCreateParameters { FromImage = image, Tag = "latest" }, null, new Progress<JSONMessage>());
+            await client.Images.CreateImageAsync(new ImagesCreateParameters { FromImage = image, Tag = "latest" }, null,
+                new Progress<JSONMessage>());
         }
     }
 
@@ -130,7 +161,8 @@ public sealed class DockerService(IDockerClient client, ILogger<IDockerService> 
         var containers = await client.Containers.ListContainersAsync(new()
         {
             All = true,
-            Filters = new Dictionary<string, IDictionary<string, bool>> { ["name"] = new Dictionary<string, bool> { [name] = default } }
+            Filters = new Dictionary<string, IDictionary<string, bool>>
+                { ["name"] = new Dictionary<string, bool> { [name] = default } }
         });
         foreach (var c in containers)
         {
@@ -155,7 +187,11 @@ public sealed class DockerService(IDockerClient client, ILogger<IDockerService> 
                 else errSb.Append(text);
             }
         }
-        finally { ArrayPool<byte>.Shared.Return(buf); }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(buf);
+        }
+
         return (outSb.ToString(), errSb.ToString());
     }
 
@@ -172,7 +208,20 @@ public sealed class DockerService(IDockerClient client, ILogger<IDockerService> 
         var err = await p.StandardError.ReadToEndAsync();
         await p.StandardOutput.ReadToEndAsync();
         await p.WaitForExitAsync();
-        if (p.ExitCode != 0 && !(ignoreExists && err.Contains("already exists")))
+        if (p.ExitCode != 0 &&
+            !(ignoreExists && (err.Contains("already exists") || err.Contains("No such file or directory"))))
             throw new InvalidOperationException($"Host command '{cmd} {args}' failed → {err}");
+    }
+
+    private async Task<bool> ChainExistsAsync(string chainName)
+    {
+        var psi = new ProcessStartInfo("sudo", $"iptables -n -L {chainName}")
+        {
+            RedirectStandardError = true,
+            RedirectStandardOutput = true
+        };
+        using var p = Process.Start(psi)!;
+        await p.WaitForExitAsync();
+        return p.ExitCode == 0;
     }
 }

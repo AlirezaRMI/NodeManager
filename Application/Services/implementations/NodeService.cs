@@ -19,7 +19,7 @@ public class NodeService(IDockerService docker, ILogger<INodeService> logger, IL
         await docker.OpenFirewallPortAsync(r.ApiPort);
 
         await docker.AddTrafficCountingRuleAsync(r.InboundPort);
-        
+
         var sslDir = $"/var/lib/easyhub-instance-data/{r.InstanceId}/ssl";
         var pemPath = Path.Combine(sslDir, "node.pem");
 
@@ -32,8 +32,14 @@ public class NodeService(IDockerService docker, ILogger<INodeService> logger, IL
             ["SSL_CLIENT_CERT_FILE"] = "/var/lib/marzban-node/ssl/node.pem",
         };
 
-        var volumes = new List<string> { $"{sslDir}:/var/lib/marzban-node/ssl:ro" };
-        var ports = new List<string> { $"{r.InboundPort}:{r.InboundPort}", $"{r.XrayPort}:62051", $"{r.ApiPort}:62050" };
+        var volumes = new List<string>
+        {
+            $"{sslDir}:/var/lib/marzban-node/ssl:ro"
+        };
+        var ports = new List<string>
+        {
+            $"{r.InboundPort}:{r.InboundPort}", $"{r.XrayPort}:62051", $"{r.ApiPort}:62050"
+        };
         var mainContainerName = $"easyhub-xray-{r.InstanceId}";
 
         var containerId = await docker.CreateContainerAsync(
