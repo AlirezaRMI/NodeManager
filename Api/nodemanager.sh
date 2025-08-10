@@ -1,25 +1,30 @@
 #!/usr/bin/env bash
 
+# اگر هر دستوری با خطا مواجه شد، اسکریپت متوقف می‌شود
 set -e
 
 echo "🚀 Starting NodeManager Full Installation..."
 
+# --- 1. System Update & Upgrade ---
 echo "Updating and upgrading system packages..."
 sudo apt-get update
 sudo apt-get upgrade -y
 
-echo "Installing dependencies (curl, git, jq, iptables-persistent)..."
-sudo apt-get install -y ca-certificates curl gnupg software-properties-common git jq iptables-persistent
+# --- 2. Install Dependencies ---
+echo "Installing dependencies (ufw, curl, git, jq, iptables-persistent)..."
+sudo apt-get install -y ufw ca-certificates curl gnupg software-properties-common git jq iptables-persistent
 
+# --- 3. Configure Firewall (UFW) ---
 echo "Configuring firewall to be secure by default..."
-sudo ufw allow ssh      
-sudo ufw allow 5050/tcp 
+sudo ufw allow ssh      # اجازه اتصال SSH
+sudo ufw allow 5050/tcp # اجازه دسترسی به API سرویس NodeManager
 sudo ufw default deny incoming
 sudo ufw default allow outgoing
-echo "y" | sudo ufw enable 
+echo "y" | sudo ufw enable # فعال‌سازی فایروال بدون سوال پرسیدن
 echo "Firewall configured and enabled. Current status:"
 sudo ufw status verbose
 
+# --- 4. Install Docker ---
 if ! command -v docker &> /dev/null; then
     echo "Docker not found. Installing Docker..."
     sudo install -m 0755 -d /etc/apt/keyrings
@@ -33,6 +38,7 @@ if ! command -v docker &> /dev/null; then
 fi
 sudo systemctl enable --now docker.service
 
+# --- 5. Clone/Update NodeManager Repo ---
 REPO_URL="https://github.com/AlirezaRMI/NodeManager.git"
 INSTALL_DIR="/opt/nodemanager"
 if [ ! -d "$INSTALL_DIR" ]; then
@@ -44,11 +50,13 @@ else
 fi
 cd "$INSTALL_DIR"
 
+# --- 6. Build NodeManager Image ---
 echo "Building NodeManager docker image..."
 sudo docker build -t nodemanager:latest .
 
+# --- 7. Create Usage Reporter Script & Timer ---
 REPORTER_SCRIPT_PATH="/opt/nodemanager/usage_reporter.sh"
-EASYHUB_ENDPOINT="https://easyui.samanii.com/api/instance/report"
+EASYHUB_ENDPOINT="https://easyui.samanii.com/api/instance/report" # آدرس ایزی‌هاب شما
 INSTANCE_DB_PATH="/var/lib/easyhub-instance-data/instances.json"
 
 echo "Creating usage reporter script..."
@@ -57,6 +65,7 @@ sudo tee "$REPORTER_SCRIPT_PATH" > /dev/null <<'EOF'
 INSTANCE_DB_PATH_VAR
 EASYHUB_ENDPOINT_VAR
 if [ ! -f "$INSTANCE_DB_PATH" ]; then exit 0; fi
+# از DOCKER-USER chain استفاده می‌کنیم که برای ترافیک کانتینرها دقیق‌تر است
 IPTABLES_OUTPUT=$(sudo iptables -L DOCKER-USER -v -n -x)
 INSTANCES_JSON=$(jq -c '.[] | {id: .Id, port: .InboundPort}' "$INSTANCE_DB_PATH")
 JSON_BODY="{\"Usages\":["
@@ -64,6 +73,7 @@ FIRST_ITEM=true
 while IFS= read -r line; do
     INSTANCE_ID=$(echo "$line" | jq '.id')
     PORT=$(echo "$line" | jq '.port')
+    # مجموع بایت‌های ورودی و خروجی برای پورت مورد نظر
     BYTES=$(echo "$IPTABLES_OUTPUT" | grep -E "tcp dpt:$PORT|tcp spt:$PORT" | awk '{s+=$2} END {print s}')
     BYTES=${BYTES:-0}
     if [ "$FIRST_ITEM" = false ]; then JSON_BODY="$JSON_BODY,"; fi
@@ -96,6 +106,7 @@ OnUnitActiveSec=10s
 WantedBy=timers.target
 EOF
 
+# --- 8. Create and Enable NodeManager Service ---
 echo "Creating systemd service for NodeManager..."
 sudo tee /etc/systemd/system/nodemanager.service > /dev/null <<EOF
 [Unit]
@@ -113,6 +124,7 @@ ExecStop=-/usr/bin/docker stop nodemanager
 WantedBy=multi-user.target
 EOF
 
+# --- 9. Start All Services ---
 echo "Reloading systemd, enabling and starting services..."
 sudo systemctl daemon-reload
 sudo systemctl enable --now nodemanager.service
