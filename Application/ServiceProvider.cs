@@ -14,6 +14,7 @@ public static class ServiceProvider
         services.AddScoped<IDockerService, DockerService>();
         services.AddScoped(typeof(INodeService), typeof(NodeService));
         services.AddHttpClient<IEasyHubApiClient, EasyHubApiClient>();
+        services.AddHostedService<PtablesRuleRestorerService>();
         services.Configure<EasyhubTemplateModel>(configuration.GetSection("EasyhubTemplateModel"));
         services.AddSingleton<ILocalInstanceStore, LocalInstanceStore>();
 
