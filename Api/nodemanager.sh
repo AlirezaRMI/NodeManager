@@ -7,17 +7,31 @@ sudo apt-get upgrade -y
 echo "Installing dependencies (ufw, curl, git, jq)..."
 # iptables-persistent از این لیست حذف شد
 sudo apt-get install -y ufw ca-certificates curl gnupg software-properties-common git jq
+
+
 echo "Configuring firewall to be secure by default..."
 sudo ufw allow ssh
 sudo ufw allow 5050/tcp
 sudo ufw default deny incoming
 sudo ufw default allow outgoing
 echo "y" | sudo ufw enable
+
+
 echo "Firewall configured and enabled. Current status:"
 sudo ufw status verbose
+
+
 echo "Installing Docker from Ubuntu's default repository..."
 sudo apt-get install -y docker.io docker-compose
 sudo systemctl enable --now docker.service
+
+echo "Creating custom iptables chains for traffic counting..."
+sudo iptables -N EASYHUB_TRAFFIC || true 
+if ! sudo iptables -C FORWARD -j EASYHUB_TRAFFIC > /dev/null 2>&1; then
+    sudo iptables -I FORWARD 1 -j EASYHUB_TRAFFIC
+fi
+sudo netfilter-persistent save
+
 REPO_URL="https://github.com/AlirezaRMI/NodeManager.git"
 INSTALL_DIR="/opt/nodemanager"
 if [ ! -d "$INSTALL_DIR" ]; then
@@ -28,6 +42,8 @@ else
     sudo git -C "$INSTALL_DIR" pull
 fi
 cd "$INSTALL_DIR"
+
+
 echo "Building NodeManager docker image..."
 sudo docker build -t nodemanager:latest -f Api/Dockerfile .
 REPORTER_SCRIPT_PATH="/opt/nodemanager/usage_reporter.sh"
@@ -39,7 +55,7 @@ sudo tee "$REPORTER_SCRIPT_PATH" > /dev/null <<'EOF'
 INSTANCE_DB_PATH_VAR
 EASYHUB_ENDPOINT_VAR
 if [ ! -f "$INSTANCE_DB_PATH" ]; then exit 0; fi
-IPTABLES_OUTPUT=$(sudo iptables -L DOCKER-USER -v -n -x)
+IPTABLES_OUTPUT=$(sudo iptables -L EASYHUB_TRAFFIC -v -n -x)
 INSTANCES_JSON=$(jq -c '.[] | {id: .Id, port: .InboundPort}' "$INSTANCE_DB_PATH")
 JSON_BODY="{\"Usages\":["
 FIRST_ITEM=true
