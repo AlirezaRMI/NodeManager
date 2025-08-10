@@ -48,7 +48,7 @@ public class NodeService(IDockerService docker, ILogger<INodeService> logger, IL
             portMappings: ports,
             environmentVariables: envVars,
             volumeMappings: volumes,
-            networkMode: "easynet");
+            networkMode:null);
 
         await docker.StartContainerAsync(containerId);
 
