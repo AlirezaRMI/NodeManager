@@ -11,6 +11,7 @@ sudo apt-get upgrade -y
 
 # --- 2. Install Dependencies ---
 echo "Installing dependencies (ufw, curl, git, jq)..."
+# docker.io و docker-compose در مرحله بعد نصب می‌شوند
 sudo apt-get install -y ufw ca-certificates curl gnupg software-properties-common git jq
 
 # --- 3. Configure Firewall (UFW) ---
@@ -23,21 +24,12 @@ echo "y" | sudo ufw enable
 echo "Firewall configured and enabled. Current status:"
 sudo ufw status verbose
 
-# --- 4. Install Docker ---
-if ! command -v docker &> /dev/null; then
-    echo "Docker not found. Installing Docker..."
-    sudo install -m 0755 -d /etc/apt/keyrings
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-    sudo chmod a+r /etc/apt/keyrings/docker.gpg
-    
-    # --- تغییر کلیدی اینجاست: به جای پیدا کردن خودکار، مستقیماً از نسخه jammy استفاده می‌کنیم ---
-    echo \
-      "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
-      jammy stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-      
-    sudo apt-get update
-    sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-fi
+# --- 4. Install Docker & Docker Compose (from Ubuntu Repo) ---
+echo "Installing Docker from Ubuntu's default repository..."
+# این دستور docker.io (موتور داکر) و docker-compose (ابزار کامپوز) را نصب می‌کند
+sudo apt-get install -y docker.io docker-compose
+
+# فعال‌سازی اجرای خودکار داکر بعد از ری‌استارت سرور
 sudo systemctl enable --now docker.service
 
 # --- 5. Clone/Update NodeManager Repo ---
