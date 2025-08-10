@@ -34,4 +34,16 @@ public interface INodeService
     /// Resumes (unpauses) a provisioned container.
     /// </summary>
     Task<string> ResumeContainerAsync(string containerId);
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <returns></returns>
+    Task<IEnumerable<InstanceInfo>> GetAllLocalInstancesAsync();
+    
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="instanceId"></param>
+    /// <returns></returns>
+    Task<string> GetInstanceTrafficAsync(long instanceId);
 }

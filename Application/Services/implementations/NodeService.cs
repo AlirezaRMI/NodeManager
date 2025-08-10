@@ -1,7 +1,9 @@
-﻿using Application.Services.Interfaces;
+﻿using System.Text.RegularExpressions;
+using Application.Services.Interfaces;
 using Domain.Model;
 using Domain.Models.Provision;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
 
 namespace Application.Services.implementations;
 
@@ -17,8 +19,6 @@ public class NodeService(IDockerService docker, ILogger<INodeService> logger, IL
         await docker.OpenFirewallPortAsync(r.InboundPort);
         await docker.OpenFirewallPortAsync(r.XrayPort);
         await docker.OpenFirewallPortAsync(r.ApiPort);
-
-        await docker.AddTrafficCountingRuleAsync(r.InboundPort);
 
         var sslDir = $"/var/lib/easyhub-instance-data/{r.InstanceId}/ssl";
         var pemPath = Path.Combine(sslDir, "node.pem");
@@ -65,10 +65,6 @@ public class NodeService(IDockerService docker, ILogger<INodeService> logger, IL
     public async Task<string> DeprovisionContainerAsync(string id, long instanceId)
     {
         var instanceInfo = (await localInstanceStore.GetAllAsync()).FirstOrDefault(i => i.Id == instanceId);
-        if (instanceInfo != null)
-        {
-            await docker.RemoveTrafficCountingRuleAsync(instanceInfo.InboundPort);
-        }
 
         await docker.StopContainerAsync(id);
         await docker.DeleteContainerAsync(id);
@@ -77,9 +73,25 @@ public class NodeService(IDockerService docker, ILogger<INodeService> logger, IL
     }
 
     public Task<string> GetContainerStatusAsync(string id) => docker.GetContainerStatusAsync(id);
-    public Task<string> GetContainerLogsAsync(string id) => docker.GetContainerLogsAsync(id);
 
-    public async Task<string> PauseContainerAsync(string id)
+    public async Task<string> GetContainerLogsAsync(string id)
+    {
+        logger.LogInformation("Fetching logs for container ID: {ContainerId}", id);
+        try
+        {
+            var logs = await docker.GetContainerLogsAsync(id);
+
+            logger.LogInformation("Successfully fetched logs for container ID: {ContainerId}", id);
+            return logs;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to get logs for container ID: {ContainerId}", id);
+            throw;
+        }
+    }
+
+public async Task<string> PauseContainerAsync(string id)
     {
         await docker.PauseContainerAsync(id);
         return $"{id} paused";
@@ -89,5 +101,49 @@ public class NodeService(IDockerService docker, ILogger<INodeService> logger, IL
     {
         await docker.UnpauseContainerAsync(id);
         return $"{id} unpaused";
+    }
+
+    public async Task<IEnumerable<InstanceInfo>> GetAllLocalInstancesAsync()
+    {
+        return await localInstanceStore.GetAllAsync();
+    }
+
+    public async Task<string> GetInstanceTrafficAsync(long instanceId)
+    {
+        var allInstances = await localInstanceStore.GetAllAsync();
+        var instance = allInstances.FirstOrDefault(i => i.Id == instanceId);
+        if (instance == null) throw new KeyNotFoundException("Instance not found.");
+
+        var port = instance.InboundPort;
+        
+        var iptablesOutput = await docker.ExecuteCommandOnHostAsync("iptables", "-L DOCKER -v -n -x");
+
+        long totalBytesIn = 0;
+        long totalBytesOut = 0;
+
+        var inboundRegex = new Regex($@"ACCEPT\s+tcp\s+--\s+.*\s+tcp\s+dpt:{port}");
+        var outboundRegex = new Regex($@"ACCEPT\s+tcp\s+--\s+.*\s+tcp\s+spt:{port}");
+
+        var lines = iptablesOutput.Split('\n');
+        foreach (var line in lines)
+        {
+            var trimmedLine = line.Trim();
+            var columns = trimmedLine.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+
+            if (columns.Length > 1)
+            {
+                if (inboundRegex.IsMatch(trimmedLine))
+                {
+                    totalBytesIn += long.Parse(columns[1]);
+                }
+                else if (outboundRegex.IsMatch(trimmedLine))
+                {
+                    totalBytesOut += long.Parse(columns[1]);
+                }
+            }
+        }
+        
+        var traffic = new { TotalBytesIn = totalBytesIn, TotalBytesOut = totalBytesOut };
+        return JsonConvert.SerializeObject(traffic);
     }
 }

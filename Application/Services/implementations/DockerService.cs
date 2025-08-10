@@ -113,11 +113,42 @@ public sealed class DockerService(IDockerClient client, ILogger<IDockerService> 
     public Task OpenFirewallPortAsync(int p, string proto = "tcp") =>
         Shell("ufw", $"allow {p}/{proto}", ignoreExists: true);
 
+    public async Task<string> ExecuteCommandOnHostAsync(string command, string args)
+    {
+        var psi = new ProcessStartInfo("sudo", $"{command} {args}")
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+
+        using var p = Process.Start(psi)!;
+        var stdout = await p.StandardOutput.ReadToEndAsync();
+        var stderr = await p.StandardError.ReadToEndAsync();
+        await p.WaitForExitAsync();
+
+        if (p.ExitCode != 0)
+        {
+            throw new InvalidOperationException($"Host command '{command} {args}' failed → {stderr}");
+        }
+
+        return stdout;
+    }
+
+
     public Task CloseFirewallPortAsync(int p, string proto = "tcp") =>
         Shell("ufw", $"delete allow {p}/{proto}", ignoreExists: true);
 
     public async Task AddTrafficCountingRuleAsync(int port)
     {
+        if (!await ChainExistsAsync("EASYHUB_TRAFFIC"))
+        {
+            logger.LogInformation("Creating EASYHUB_TRAFFIC chain in iptables...");
+            await Shell("iptables", "-N EASYHUB_TRAFFIC");
+            await Shell("iptables", "-A FORWARD -j EASYHUB_TRAFFIC");
+        }
+
         await Shell("iptables", $"-A EASYHUB_TRAFFIC -p tcp --dport {port}");
         await Shell("iptables", $"-A EASYHUB_TRAFFIC -p tcp --sport {port}");
         await Shell("netfilter-persistent", "save");
@@ -125,9 +156,12 @@ public sealed class DockerService(IDockerClient client, ILogger<IDockerService> 
 
     public async Task RemoveTrafficCountingRuleAsync(int port)
     {
-        await Shell("iptables", $"-D EASYHUB_TRAFFIC -p tcp --dport {port}", ignoreExists: true);
-        await Shell("iptables", $"-D EASYHUB_TRAFFIC -p tcp --sport {port}", ignoreExists: true);
-        await Shell("netfilter-persistent", "save");
+        if (await ChainExistsAsync("EASYHUB_TRAFFIC"))
+        {
+            await Shell("iptables", $"-D EASYHUB_TRAFFIC -p tcp --dport {port}", ignoreExists: true);
+            await Shell("iptables", $"-D EASYHUB_TRAFFIC -p tcp --sport {port}", ignoreExists: true);
+            await Shell("iptables-save", "> /etc/iptables/rules.v4");
+        }
     }
 
     private async Task EnsureImageAsync(string image)
@@ -184,7 +218,7 @@ public sealed class DockerService(IDockerClient client, ILogger<IDockerService> 
         return (outSb.ToString(), errSb.ToString());
     }
 
-    private async Task Shell(string cmd, string args, bool ignoreExists = false)
+    public async Task Shell(string cmd, string args, bool ignoreExists = false)
     {
         var psi = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
             ? new ProcessStartInfo("cmd.exe", $"/c {cmd} {args}")
@@ -202,7 +236,7 @@ public sealed class DockerService(IDockerClient client, ILogger<IDockerService> 
             throw new InvalidOperationException($"Host command '{cmd} {args}' failed → {err}");
     }
 
-    private async Task<bool> ChainExistsAsync(string chainName)
+    public async Task<bool> ChainExistsAsync(string chainName)
     {
         var psi = new ProcessStartInfo("sudo", $"iptables -n -L {chainName}")
         {
@@ -213,4 +247,5 @@ public sealed class DockerService(IDockerClient client, ILogger<IDockerService> 
         await p.WaitForExitAsync();
         return p.ExitCode == 0;
     }
+    
 }
