@@ -1,4 +1,6 @@
-﻿namespace Application.Services.Interfaces;
+﻿using Docker.DotNet.Models;
+
+namespace Application.Services.Interfaces;
 
 /// <summary>
 /// Defines a service for managing the complete lifecycle of Docker containers 
@@ -14,6 +16,7 @@ public interface IDockerService
     Task StartContainerAsync(string id);
     Task StopContainerAsync(string id);
     Task DeleteContainerAsync(string id);
+    Task<ContainerStatsResponse> GetContainerStatsAsync(string id);
     Task<string> GetContainerStatusAsync(string id);
     Task PauseContainerAsync(string id);
     Task UnpauseContainerAsync(string id);

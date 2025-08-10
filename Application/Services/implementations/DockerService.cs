@@ -82,6 +82,35 @@ public sealed class DockerService(IDockerClient client, ILogger<IDockerService> 
         var (outBuf, errBuf) = await DemuxAsync(mux);
         return outBuf + (errBuf.Length == 0 ? "" : "\n---stderr---\n" + errBuf);
     }
+    
+    public async Task<ContainerStatsResponse> GetContainerStatsAsync(string containerId)
+    {
+        var cts = new CancellationTokenSource();
+        ContainerStatsResponse? statsResponse = null;
+
+        var progress = new Progress<ContainerStatsResponse>(stats =>
+        {
+            if (stats.MemoryStats == null) return;
+            statsResponse = stats;
+            cts.Cancel();
+        });
+
+        var parameters = new ContainerStatsParameters { Stream = true };
+        
+        try
+        {
+            await client.Containers.GetContainerStatsAsync(containerId, parameters, progress, cts.Token);
+        }
+        catch (TaskCanceledException)
+        {
+           
+        }
+        
+        if (statsResponse == null)
+            throw new InvalidOperationException($"Could not retrieve stats for container {containerId}.");
+            
+        return statsResponse;
+    }
 
     public async Task<string> ExecuteCommandInContainerAsync(string id, string[] cmd)
     {
@@ -130,11 +159,9 @@ public sealed class DockerService(IDockerClient client, ILogger<IDockerService> 
 
         if (p.ExitCode != 0)
         {
-            if (!stderr.Contains("No chain/target/match by that name"))
-            {
-                throw new InvalidOperationException($"Host command '{command} {args}' failed → {stderr}");
-            }
+            throw new InvalidOperationException($"Host command '{command} {args}' failed → {stderr}");
         }
+
         return stdout;
     }
 

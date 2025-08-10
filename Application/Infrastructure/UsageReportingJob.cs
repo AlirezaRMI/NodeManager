@@ -5,6 +5,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
+namespace Application.Infrastructure;
+
 public class UsageReportingJob(IServiceProvider serviceProvider, ILogger<UsageReportingJob> logger)
     : IHostedService, IDisposable
 {

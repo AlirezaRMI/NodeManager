@@ -80,7 +80,6 @@ public class NodeService(IDockerService docker, ILogger<INodeService> logger, IL
         try
         {
             var logs = await docker.GetContainerLogsAsync(id);
-
             logger.LogInformation("Successfully fetched logs for container ID: {ContainerId}", id);
             return logs;
         }
@@ -110,33 +109,22 @@ public async Task<string> PauseContainerAsync(string id)
 
     public async Task<string> GetInstanceTrafficAsync(long instanceId)
     {
-        var allInstances = await localInstanceStore.GetAllAsync();
-        var instance = allInstances.FirstOrDefault(i => i.Id == instanceId);
-        if (instance == null) throw new KeyNotFoundException("Instance not found.");
+        var mainContainerName = $"easyhub-xray-{instanceId}";
+        var stats = await docker.GetContainerStatsAsync(mainContainerName);
 
-        var port = instance.InboundPort;
-        
-        var iptablesOutput = await docker.ExecuteCommandOnHostAsync("iptables", $"-t nat -L DOCKER -v -n -x");
+        long totalBytesIn = 0;
+        long totalBytesOut = 0;
 
-        long totalBytes = 0;
-        
-        var regex = new Regex($@"dpt:{port}\s+to:.*");
-        
-        var lines = iptablesOutput.Split('\n');
-        foreach (var line in lines)
+        if (stats.Networks != null)
         {
-            var trimmedLine = line.Trim();
-            if (regex.IsMatch(trimmedLine))
+            foreach (var network in stats.Networks.Values)
             {
-                var columns = trimmedLine.Split([' '], StringSplitOptions.RemoveEmptyEntries);
-                if (columns.Length > 1)
-                {
-                    totalBytes += long.Parse(columns[1]);
-                }
+                totalBytesIn += (long)network.RxBytes;
+                totalBytesOut += (long)network.TxBytes;
             }
         }
         
-        var traffic = new { TotalBytesIn = totalBytes, TotalBytesOut = 0L };
+        var traffic = new { TotalBytesIn = totalBytesIn, TotalBytesOut = totalBytesOut };
         return JsonConvert.SerializeObject(traffic);
     }
 }
