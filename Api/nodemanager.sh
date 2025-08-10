@@ -29,9 +29,12 @@ if ! command -v docker &> /dev/null; then
     sudo install -m 0755 -d /etc/apt/keyrings
     curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
     sudo chmod a+r /etc/apt/keyrings/docker.gpg
+    
+    # --- تغییر کلیدی اینجاست: به جای پیدا کردن خودکار، مستقیماً از نسخه jammy استفاده می‌کنیم ---
     echo \
       "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
-      $(. /etc/os-release && echo \"$VERSION_CODEName\") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+      jammy stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+      
     sudo apt-get update
     sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 fi
@@ -51,8 +54,6 @@ cd "$INSTALL_DIR"
 
 # --- 6. Build NodeManager Image ---
 echo "Building NodeManager docker image..."
-# --- تغییر کلیدی: آدرس Dockerfile را به صورت دقیق مشخص می‌کنیم ---
-# فرض بر این است که Dockerfile شما در پوشه Api قرار دارد
 sudo docker build -t nodemanager:latest -f Api/Dockerfile .
 
 # --- 7. Create Usage Reporter Script & Timer ---
