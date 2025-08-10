@@ -8,15 +8,15 @@ echo "Updating and upgrading system packages..."
 sudo apt-get update
 sudo apt-get upgrade -y
 
-echo "Installing dependencies (curl, git, jq, iptables-persistent)..."
-sudo apt-get install -y ca-certificates curl gnupg software-properties-common git jq iptables-persistent
+echo "Installing dependencies (ufw, curl, git, jq)..."
+sudo apt-get install -y ufw ca-certificates curl gnupg software-properties-common git jq
 
 echo "Configuring firewall to be secure by default..."
-sudo ufw allow ssh      
-sudo ufw allow 5050/tcp 
+sudo ufw allow ssh
+sudo ufw allow 5050/tcp
 sudo ufw default deny incoming
 sudo ufw default allow outgoing
-echo "y" | sudo ufw enable 
+echo "y" | sudo ufw enable
 echo "Firewall configured and enabled. Current status:"
 sudo ufw status verbose
 
