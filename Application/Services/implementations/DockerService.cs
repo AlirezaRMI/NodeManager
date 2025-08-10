@@ -118,27 +118,16 @@ public sealed class DockerService(IDockerClient client, ILogger<IDockerService> 
 
     public async Task AddTrafficCountingRuleAsync(int port)
     {
-        if (!await ChainExistsAsync("DOCKER-USER"))
-        {
-            logger.LogWarning("DOCKER-USER chain not found. Creating it now...");
-            await Shell("iptables", "-N DOCKER-USER");
-            await Shell("iptables", "-I FORWARD -j DOCKER-USER");
-        }
-
-        await Shell("iptables", $"-I DOCKER-USER -p tcp --dport {port} -j RETURN");
-        await Shell("iptables", $"-I DOCKER-USER -p tcp --sport {port} -j RETURN");
-
-        // await Shell("netfilter-persistent", "save");
+        await Shell("iptables", $"-A EASYHUB_TRAFFIC -p tcp --dport {port}");
+        await Shell("iptables", $"-A EASYHUB_TRAFFIC -p tcp --sport {port}");
+        await Shell("netfilter-persistent", "save");
     }
 
     public async Task RemoveTrafficCountingRuleAsync(int port)
     {
-        if (await ChainExistsAsync("DOCKER-USER"))
-        {
-            await Shell("iptables", $"-D DOCKER-USER -p tcp --dport {port} -j RETURN", ignoreExists: true);
-            await Shell("iptables", $"-D DOCKER-USER -p tcp --sport {port} -j RETURN", ignoreExists: true);
-            // await Shell("netfilter-persistent", "save");
-        }
+        await Shell("iptables", $"-D EASYHUB_TRAFFIC -p tcp --dport {port}", ignoreExists: true);
+        await Shell("iptables", $"-D EASYHUB_TRAFFIC -p tcp --sport {port}", ignoreExists: true);
+        await Shell("netfilter-persistent", "save");
     }
 
     private async Task EnsureImageAsync(string image)

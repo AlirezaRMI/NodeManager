@@ -10,8 +10,8 @@ sudo apt-get update
 sudo apt-get upgrade -y
 
 # --- 2. Install Dependencies ---
-echo "Installing dependencies (ufw, curl, git, jq)..."
-sudo apt-get install -y ufw ca-certificates curl gnupg software-properties-common git jq
+echo "Installing dependencies (ufw, curl, git, jq, iptables-persistent)..."
+sudo apt-get install -y ufw ca-certificates curl gnupg software-properties-common git jq iptables-persistent
 
 # --- 3. Configure Firewall (UFW) ---
 echo "Configuring firewall to be secure by default..."
@@ -23,12 +23,18 @@ echo "y" | sudo ufw enable
 echo "Firewall configured and enabled. Current status:"
 sudo ufw status verbose
 
-# --- 4. Install Docker & Docker Compose (from Ubuntu Repo) ---
+# --- 4. Install Docker (from Ubuntu Repo) ---
 echo "Installing Docker from Ubuntu's default repository..."
 sudo apt-get install -y docker.io docker-compose
 sudo systemctl enable --now docker.service
 
-# --- 5. Clone/Update NodeManager Repo ---
+echo "Creating custom iptables chain 'EASYHUB_TRAFFIC' for monitoring..."
+sudo iptables -N EASYHUB_TRAFFIC || true 
+if ! sudo iptables -C FORWARD -j EASYHUB_TRAFFIC > /dev/null 2>&1; then
+    sudo iptables -I FORWARD 1 -j EASYHUB_TRAFFIC
+fi
+sudo netfilter-persistent save
+
 REPO_URL="https://github.com/AlirezaRMI/NodeManager.git"
 INSTALL_DIR="/opt/nodemanager"
 if [ ! -d "$INSTALL_DIR" ]; then
@@ -40,11 +46,9 @@ else
 fi
 cd "$INSTALL_DIR"
 
-# --- 6. Build NodeManager Image ---
 echo "Building NodeManager docker image..."
 sudo docker build -t nodemanager:latest -f Api/Dockerfile .
 
-# --- 7. Create Usage Reporter Script & Timer ---
 REPORTER_SCRIPT_PATH="/opt/nodemanager/usage_reporter.sh"
 EASYHUB_ENDPOINT="https://easyui.samanii.com/api/instance/report"
 INSTANCE_DB_PATH="/var/lib/easyhub-instance-data/instances.json"
@@ -55,7 +59,7 @@ sudo tee "$REPORTER_SCRIPT_PATH" > /dev/null <<'EOF'
 INSTANCE_DB_PATH_VAR
 EASYHUB_ENDPOINT_VAR
 if [ ! -f "$INSTANCE_DB_PATH" ]; then exit 0; fi
-IPTABLES_OUTPUT=$(sudo iptables -L DOCKER-USER -v -n -x)
+IPTABLES_OUTPUT=$(sudo iptables -L EASYHUB_TRAFFIC -v -n -x)
 INSTANCES_JSON=$(jq -c '.[] | {id: .Id, port: .InboundPort}' "$INSTANCE_DB_PATH")
 JSON_BODY="{\"Usages\":["
 FIRST_ITEM=true
@@ -94,33 +98,23 @@ OnUnitActiveSec=10s
 WantedBy=timers.target
 EOF
 
-# --- 8. Create and Enable NodeManager Service ---
 echo "Creating systemd service for NodeManager..."
 sudo tee /etc/systemd/system/nodemanager.service > /dev/null <<EOF
 [Unit]
 Description=NodeManager Docker Container
 After=docker.service
 Requires=docker.service
-
 [Service]
 Restart=always
 RestartSec=10s
-
-# این دستور قبل از اجرای اصلی اجرا شده و منتظر آماده شدن زنجیره DOCKER-USER می‌ماند
-ExecStartPre=/bin/bash -c 'while ! /usr/sbin/iptables -L DOCKER-USER >/dev/null 2>&1; do echo "Waiting for Docker iptables chain..."; sleep 1; done'
-
 ExecStartPre=-/usr/bin/docker stop nodemanager
 ExecStartPre=-/usr/bin/docker rm nodemanager
-
-# پورت 8080 داخل کانتینر به 5050 هاست مپ شده است
 ExecStart=/usr/bin/docker run --name nodemanager --privileged -p 5050:8080 -v /var/run/docker.sock:/var/run/docker.sock -v /var/lib/easyhub-instance-data:/var/lib/easyhub-instance-data nodemanager:latest
 ExecStop=-/usr/bin/docker stop nodemanager
-
 [Install]
 WantedBy=multi-user.target
 EOF
 
-# --- 9. Start All Services ---
 echo "Reloading systemd, enabling and starting services..."
 sudo systemctl daemon-reload
 sudo systemctl enable --now nodemanager.service
