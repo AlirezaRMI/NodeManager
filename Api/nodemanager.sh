@@ -37,7 +37,7 @@ After=docker.service
 Requires=docker.service
 [Service]
 Restart=always
-RestartSec=10s
+RestartSec=30s
 ExecStartPre=-/usr/bin/docker stop nodemanager
 ExecStartPre=-/usr/bin/docker rm nodemanager
 ExecStart=/usr/bin/docker run --name nodemanager --privileged -p 5050:8080 -v /var/run/docker.sock:/var/run/docker.sock -v /var/lib/easyhub-instance-data:/var/lib/easyhub-instance-data nodemanager:latest
