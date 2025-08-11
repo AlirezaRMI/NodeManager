@@ -14,7 +14,7 @@ public class UsageReportingJob(IServiceProvider serviceProvider, ILogger<UsageRe
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
-        _timer = new Timer(DoWork, null, TimeSpan.FromMinutes(1), TimeSpan.FromSeconds(10));
+        _timer = new Timer(DoWork, null, TimeSpan.FromMinutes(1), TimeSpan.FromSeconds(30));
         return Task.CompletedTask;
     }
 
