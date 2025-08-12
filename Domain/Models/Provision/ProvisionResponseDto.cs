@@ -7,7 +7,6 @@ public class ProvisionResponseDto
     
     public string? ErrorMessage { get; set; } 
     public string? ContainerDockerId { get; set; }
-    public string? XrayUserUuid { get; set; } 
     
     public string? GeneratedXrayConfigJson { get; set; } 
 }
