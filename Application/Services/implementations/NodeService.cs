@@ -1,5 +1,4 @@
-﻿using System.Text.RegularExpressions;
-using Application.Services.Interfaces;
+﻿using Application.Services.Interfaces;
 using Domain.Model;
 using Domain.Models.Provision;
 using Microsoft.Extensions.Logging;
@@ -38,7 +37,9 @@ public class NodeService(IDockerService docker, ILogger<INodeService> logger, IL
         };
         var ports = new List<string>
         {
-            $"{r.InboundPort}:{r.InboundPort}", $"{r.XrayPort}:62051", $"{r.ApiPort}:62050"
+            $"{r.InboundPort}:{r.InboundPort}",
+            $"{r.XrayPort}:62051",
+            $"{r.ApiPort}:62050"
         };
         var mainContainerName = $"easyhub-xray-{r.InstanceId}";
 
@@ -57,8 +58,9 @@ public class NodeService(IDockerService docker, ILogger<INodeService> logger, IL
         logger.LogInformation("Container started ({Id})", containerId);
         return new ProvisionResponseDto
         {
-            ProvisionedInstanceId = r.InstanceId, IsSuccess = true, ContainerDockerId = containerId,
-            XrayUserUuid = "UUID_NOT_EXTRACTED",
+            ProvisionedInstanceId = r.InstanceId,
+            IsSuccess = true, 
+            ContainerDockerId = containerId,
         };
     }
 
