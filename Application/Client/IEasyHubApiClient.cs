@@ -4,5 +4,5 @@ namespace Application.Client;
 
 public interface IEasyHubApiClient
 {
-    Task SubmitUsageAsync(UsageReportDto report); 
+    Task SubmitUsageAsync(UsageReportDto report,string? apiKey); 
 }

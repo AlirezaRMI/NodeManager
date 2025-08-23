@@ -1,13 +1,14 @@
 ﻿using Application.Client;
 using Application.Services.Interfaces;
 using Domain.Model;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace Application.Infrastructure;
 
-public class UsageReportingJob(IServiceProvider serviceProvider, ILogger<UsageReportingJob> logger)
+public class UsageReportingJob(IServiceProvider serviceProvider, ILogger<UsageReportingJob> logger,IConfiguration configuration)
     : IHostedService, IDisposable
 {
     private Timer? _timer;
@@ -25,6 +26,7 @@ public class UsageReportingJob(IServiceProvider serviceProvider, ILogger<UsageRe
             using var scope = serviceProvider.CreateScope();
             var nodeService = scope.ServiceProvider.GetRequiredService<INodeService>();
             var easyHubClient = scope.ServiceProvider.GetRequiredService<IEasyHubApiClient>();
+            var apiKey = configuration["ApiSecret:Key"];
 
             var localInstances = await nodeService.GetAllLocalInstancesAsync();
             if (!localInstances.Any()) return;
@@ -53,9 +55,9 @@ public class UsageReportingJob(IServiceProvider serviceProvider, ILogger<UsageRe
                 }
             }
 
-            if (report.Usages.Any())
+            if (report.Usages.Count != 0)
             {
-                await easyHubClient.SubmitUsageAsync(report);
+                await easyHubClient.SubmitUsageAsync(report,apiKey);
             }
         }
         catch (Exception ex)

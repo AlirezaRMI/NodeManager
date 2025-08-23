@@ -1,6 +1,7 @@
 ﻿using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using Domain.Model;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -11,12 +12,16 @@ public class EasyHubApiClient(
     HttpClient httpClient,
     IOptions<EasyhubTemplateModel> options) : IEasyHubApiClient
 {
-    public async Task SubmitUsageAsync(UsageReportDto report)
+ 
+    public async Task SubmitUsageAsync(UsageReportDto report,string? apiKey)
     {
+        
+        httpClient.BaseAddress = new Uri(options.Value.Url!.TrimEnd('/'));
+        httpClient.DefaultRequestHeaders.Clear();
         httpClient.DefaultRequestHeaders.Accept.Add(
             new MediaTypeWithQualityHeaderValue("application/json"));
+        httpClient.DefaultRequestHeaders.Add("X-Api-Key", apiKey);
 
-        httpClient.BaseAddress = new Uri(options.Value.Url!.TrimEnd('/'));
 
         var requestUrl = EasyHubUrlPath.UpdateUsage;
         logger.LogInformation("Submitting usage report to EasyHub at {Url}", requestUrl);
