@@ -23,8 +23,7 @@ public interface IDockerService
     Task CreateDirectoryOnHostAsync(string path);
     Task WriteFileOnHostAsync(string filePath, string content);
     Task OpenFirewallPortAsync(int p, string proto = "tcp");
-
     Task<string> ExecuteCommandOnHostAsync(string command, string args);
-
     Task<string> GetContainerLogsAsync(string id);
+    Task CloseFirewallPortAsync(int p, string proto = "tcp");
 }

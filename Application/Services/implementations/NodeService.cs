@@ -49,7 +49,7 @@ public class NodeService(IDockerService docker, ILogger<INodeService> logger, IL
             portMappings: ports,
             environmentVariables: envVars,
             volumeMappings: volumes,
-            networkMode:null);
+            networkMode: null);
 
         await docker.StartContainerAsync(containerId);
 
@@ -59,19 +59,36 @@ public class NodeService(IDockerService docker, ILogger<INodeService> logger, IL
         return new ProvisionResponseDto
         {
             ProvisionedInstanceId = r.InstanceId,
-            IsSuccess = true, 
+            IsSuccess = true,
             ContainerDockerId = containerId,
         };
     }
 
-    public async Task<string> DeprovisionContainerAsync(string id, long instanceId)
+    public async Task DeprovisionContainerAsync(long instanceId)
     {
-        var instanceInfo = (await localInstanceStore.GetAllAsync()).FirstOrDefault(i => i.Id == instanceId);
+        var mainContainerName = $"easyhub-xray-{instanceId}";
+        logger.LogInformation("Starting deprovision process for instance {InstanceId} (container: {ContainerName})",
+            instanceId, mainContainerName);
 
-        await docker.StopContainerAsync(id);
-        await docker.DeleteContainerAsync(id);
-        await localInstanceStore.RemoveAsync(instanceId);
-        return $"Container {id} removed";
+        await docker.StopContainerAsync(mainContainerName);
+        await docker.DeleteContainerAsync(mainContainerName);
+        logger.LogInformation("Container {ContainerName} stopped and removed.", mainContainerName);
+
+        var instanceInfo = (await localInstanceStore.GetAllAsync()).FirstOrDefault(i => i.Id == instanceId);
+        if (instanceInfo != null)
+        {
+            await docker.CloseFirewallPortAsync(instanceInfo.InboundPort);
+            logger.LogInformation("Firewall port {Port} closed.", instanceInfo.InboundPort);
+
+            await localInstanceStore.RemoveAsync(instanceId);
+            logger.LogInformation("Instance info removed from local store.");
+        }
+
+        var instanceDir = $"/var/lib/easyhub-instance-data/{instanceId}";
+        await docker.ExecuteCommandOnHostAsync("rm", $"-rf {instanceDir}");
+        logger.LogInformation("Instance directory {Directory} removed from host.", instanceDir);
+
+        logger.LogInformation("Successfully deprovisioned all resources for instance {InstanceId}", instanceId);
     }
 
     public Task<string> GetContainerStatusAsync(string id) => docker.GetContainerStatusAsync(id);
@@ -92,7 +109,7 @@ public class NodeService(IDockerService docker, ILogger<INodeService> logger, IL
         }
     }
 
-public async Task<string> PauseContainerAsync(string id)
+    public async Task<string> PauseContainerAsync(string id)
     {
         await docker.PauseContainerAsync(id);
         return $"{id} paused";
@@ -125,7 +142,7 @@ public async Task<string> PauseContainerAsync(string id)
                 totalBytesOut += (long)network.TxBytes;
             }
         }
-        
+
         var traffic = new { TotalBytesIn = totalBytesIn, TotalBytesOut = totalBytesOut };
         return JsonConvert.SerializeObject(traffic);
     }

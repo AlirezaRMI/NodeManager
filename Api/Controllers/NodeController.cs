@@ -1,4 +1,5 @@
-﻿using Application.Services.Interfaces;
+﻿using Api.Securities;
+using Application.Services.Interfaces;
 using Domain.Models.Provision;
 using Microsoft.AspNetCore.Mvc;
 
@@ -6,6 +7,7 @@ namespace Api.Controllers
 {
     [ApiController]
     [Route("api/provisioning")]
+    [ApiKeyAuthorize] 
     public class ProvisioningController(INodeService service) : ControllerBase
     {
         [HttpPost("container")]
@@ -19,17 +21,6 @@ namespace Api.Controllers
             var response = await service.ProvisionContainerAsync(request);
             return Ok(response);
         }
-
-        // [HttpDelete("container/{containerId}")]
-        // [EndpointName("deprovision Container")]
-        // [EndpointSummary("stops and deletes a Xray container instance.")]
-        // [ProducesResponseType(typeof(string), StatusCodes.Status200OK)]
-        // [ProducesResponseType(typeof(string), StatusCodes.Status404NotFound)]
-        // public async Task<IActionResult> DeprovisionContainer([FromRoute] string containerId)
-        // {
-        //     var message = await service.DeprovisionContainerAsync(containerId);
-        //     return Ok(message);
-        // }
 
         [HttpGet("container/{containerId}/status")]
         [EndpointName("get Container Status")]
@@ -72,6 +63,16 @@ namespace Api.Controllers
         {
             return Ok(await service.ResumeContainerAsync(containerId));
         }
-        
+
+        [HttpDelete("container/{instanceId:long}")]
+        [EndpointName("Deprovision Instance")]
+        [EndpointSummary("Stops, removes, and cleans up all resources for an instance.")]
+        [ProducesResponseType(typeof(string), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(string), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> DeprovisionInstance([FromRoute] long instanceId)
+        {
+            await service.DeprovisionContainerAsync(instanceId);
+            return Ok();
+        }
     }
 }

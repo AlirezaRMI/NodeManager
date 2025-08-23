@@ -13,7 +13,7 @@ public interface INodeService
     /// <summary>
     /// Requests to deprovision (stop and delete) an existing X-ray container instance.
     /// </summary>
-    Task<string> DeprovisionContainerAsync(string containerId, long instanceId);
+    Task DeprovisionContainerAsync(long instanceId);
 
     /// <summary>
     /// Retrieves the current status of a provisioned container.
