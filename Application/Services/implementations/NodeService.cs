@@ -131,19 +131,20 @@ public class NodeService(IDockerService docker, ILogger<INodeService> logger, IL
         var mainContainerName = $"easyhub-xray-{instanceId}";
         var stats = await docker.GetContainerStatsAsync(mainContainerName);
 
-        long totalBytesIn = 0;
-        long totalBytesOut = 0;
+        long downloadBytes = 0;
+        long uploadBytes   = 0; 
 
+    
         if (stats.Networks != null)
         {
-            foreach (var network in stats.Networks.Values)
+            foreach (var nw in stats.Networks.Values)
             {
-                totalBytesIn += (long)network.RxBytes;
-                totalBytesOut += (long)network.TxBytes;
+                uploadBytes   += (long)nw.RxBytes;
+                downloadBytes += (long)nw.TxBytes; 
             }
         }
 
-        var traffic = new { TotalBytesIn = totalBytesIn, TotalBytesOut = totalBytesOut };
+        var traffic = new { DownloadBytes = downloadBytes };
         return JsonConvert.SerializeObject(traffic);
     }
 }
